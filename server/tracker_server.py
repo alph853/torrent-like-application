@@ -1,61 +1,61 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Request
 from typing import List, Dict
 from pydantic import BaseModel
 import uvicorn
 from hashlib import sha1
 from fastapi.responses import JSONResponse
+from .database import Database, Torrent, Peer
+from .utils import to_compact
 
 app = FastAPI()
 
-# In-memory store for peers based on torrent info hash
-torrents: Dict[str, List[Dict[str, str]]] = {}
-
+TORRENT_DATABASE = Database()
 
 @app.get("/announce")
 async def announce(
+    request: Request,
     info_hash: str,
     peer_id: str,
-    ip: str,
-    port: int,
     uploaded: int,
     downloaded: int,
     left: int,
-    event: str | None = None
+    compact: int,
+    event: str | None = None,
 ):
     """Handle GET requests from peers announcing their status to the tracker."""
-    info_hash_hex = sha1(info_hash.encode()).hexdigest()
+    if TORRENT_DATABASE.get_torrent(info_hash) is None:
+        return JSONResponse(content={"error": "Torrent not found"}, status_code=404)
 
-    # Check if the torrent exists in the in-memory database
-    if info_hash_hex not in torrents:
-        torrents[info_hash_hex] = []
-
-    # Peer data to store
-    peer_data = {
-        "peer_id": peer_id,
-        "ip": ip,
-        "port": port,
-        "uploaded": uploaded,
-        "downloaded": downloaded,
-        "left": left
-    }
+    ip, port = request.client.host, request.client.port
+    peer = Peer(
+        peer_id=peer_id,
+        ip=ip,
+        port=port,
+        uploaded=uploaded,
+        downloaded=downloaded,
+        left=left,
+        status=event,
+        info_hash=info_hash,
+    )
 
     if event == "started":
-        torrents[info_hash_hex].append(peer_data)
-        print(f"Peer {peer_id} started and was added to the swarm.")
+        TORRENT_DATABASE.add_peer(peer)
+        print(f"peer {peer_id} has joined the swarm")
     elif event == "completed":
-        for peer in torrents[info_hash_hex]:
-            if peer["peer_id"] == peer_id:
-                peer["left"] = 0
-                print(f"Peer {peer_id} completed downloading and is now seeding.")
+        peer.left = 0
+        TORRENT_DATABASE.update_peer(peer)
+        print(f"peer {peer_id} has began seeding")
     elif event == "stopped":
-        torrents[info_hash_hex] = [peer for peer in torrents[info_hash_hex] if peer["peer_id"] != peer_id]
+        TORRENT_DATABASE.remove_peer(peer)
         print(f"Peer {peer_id} has left the swarm.")
 
     # Return the list of peers to the requesting peer
-    peer_list = [{"ip": peer["ip"], "port": peer["port"]}
-                 for peer in torrents[info_hash_hex] if peer["peer_id"] != peer_id]
-
-    return JSONResponse(content={"peers": peer_list})
+    peer_list = TORRENT_DATABASE.get_torrent_peers(info_hash)
+    if compact:
+        response = to_compact(peer_list)
+    else:
+        response = JSONResponse(content=peer_list)
+    return response
 
 
 # @app.get("/scrape")

@@ -5,10 +5,6 @@ import sys
 from utils import TorrentClient
 
 
-IP = "123"
-PORT = "456"
-
-
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -33,8 +29,7 @@ class MainWindow(QMainWindow):
 
         if dialog.exec() == QDialog.DialogCode.Accepted:
             magnet_link = dialog.get_result()
-            client = TorrentClient(IP, PORT, magnet_link=magnet_link)
-            tracker_response = client.send_tracker_request(test=True)
+            client = TorrentClient(magnet_link=magnet_link)
             config_form = ConfigForm(display_name=client.display_name,
                                      file_names=tracker_response['files'], info=tracker_response['info'])
 
