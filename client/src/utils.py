@@ -4,6 +4,12 @@ import bencodepy
 import hashlib
 from urllib.parse import urlparse, parse_qs
 
+def extract_pieces_hashes(pieces_hashes):
+    index, result = 0, []
+    while index < len(pieces_hashes):
+        result.append(pieces_hashes[index: index + 20].hex())
+        index += 20
+        return result
 
 class TorrentUtilsClass:
     @staticmethod
@@ -11,11 +17,11 @@ class TorrentUtilsClass:
         """Generate a unique peer ID."""
         return '-BT0001-' + hashlib.sha1(os.urandom(20)).hexdigest()[:12]
 
+    
     @staticmethod
     def compute_info_hash(torrent_data) -> bytes:
         """Compute the SHA-1 hash of the info section of the torrent file."""
-        info = bencodepy.encode(torrent_data[b'info'])
-        return hashlib.sha1(info).digest()
+        return hashlib.sha1(extract_pieces_hashes(torrent_data)).digest()
 
     @staticmethod
     def parse_magnet_link(magnet_link) -> tuple[str, str, str]:
@@ -34,6 +40,12 @@ class TorrentUtilsClass:
         print(type(info_hash))
 
         return info_hash, tracker_url, display_name
+    
+    def parse_torrent_file(self,torrent_file)->tuple[str,str,str]:
+        tracker_url = torrent_file["announce"].decode()
+        display_name = torrent_file["info"]['name']
+        info_hash = self.compute_info_hash(torrent_file["info"]["pieces"])
+        
 
     @staticmethod
     def parse_compacted_peer_list(peer_compacted_string) -> list[dict]:

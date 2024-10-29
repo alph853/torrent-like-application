@@ -43,7 +43,7 @@ class PeerConnection:
         self.peer_id = peer['id']
         self.extension_supported = extension_supported
         self.piece_manager = piece_manager
-
+        
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.init_connection()
 

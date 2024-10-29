@@ -3,7 +3,8 @@ from widgets import AddFileDialog, ConfigForm
 from PyQt6.uic import loadUi
 import sys
 from utils import TorrentClient
-
+import bencodepy
+import hashlib
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -21,6 +22,14 @@ class MainWindow(QMainWindow):
 
         if dialog.exec() == QDialog.DialogCode.Accepted:
             torrent_file_path = dialog.get_result()
+            with open(torrent_file_path,"rb") as torrent_file: 
+                bencoded_content = torrent_file.read()
+
+            torrent = decode_bencode(bencoded_content)
+            client = TorrentClient(torrent_file=torrent)
+            
+            
+            
 
     def add_magnet_link(self):
         title = "Add Magnet Link"

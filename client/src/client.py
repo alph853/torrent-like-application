@@ -24,13 +24,19 @@ class TorrentClient:
         self.peer_connections: dict[str, PeerConnection] = {}
 
         if magnet_link:
-            magnet_params = TorrentUtils.parse_magnet_link(magnet_link)
-            self.info_hash = magnet_params['info_hash']
-            self.tracker_url = magnet_params['tracker_url']
-            self.display_name = magnet_params['display_name']
-
+            params = TorrentUtils.parse_magnet_link(magnet_link)
+        elif torrent_file: 
+            params = TorrentUtils.parse_torrent_file(torrent_file)
+            
+        self.info_hash = params['info_hash']
+        self.tracker_url = params['tracker_url']
+        self.display_name = params['display_name']
         self.interval, peer_list = self.send_tracker_request()
+
         self.piece_manager = PieceManager(peer_list)
+        
+     
+        
 
     def send_tracker_request(self) -> tuple:
         params = {
