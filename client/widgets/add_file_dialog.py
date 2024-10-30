@@ -95,7 +95,7 @@ class AddFileDialogTorrent(QDialog):
         )
         if file_name:
             self.selected_file = file_name
-            self.filename_line.setText(file_name)
+            self.file_name_label.setText(f"Selected file: {file_name}") 
 
     def accept(self):
         self.result = self.selected_file
@@ -103,3 +103,30 @@ class AddFileDialogTorrent(QDialog):
 
     def get_result(self):
         return self.result
+
+class ConfigFormTorrent(QDialog):
+    def __init__(self, display_name, file_names, info):
+        super().__init__()
+        self.setWindowTitle(display_name)
+        self.setGeometry(100, 100, 300, 400)
+
+        self.layout = QVBoxLayout()
+
+        self.label = QLabel("Select a file to download:")
+        self.layout.addWidget(self.label)
+
+        # Create a QListWidget to display file names
+        self.file_list_widget = QListWidget()
+        self.file_list_widget.addItems(file_names)  # Add file names to the list widget
+        self.layout.addWidget(self.file_list_widget)
+
+        # Add an OK button to confirm selection
+        self.ok_button = QPushButton("OK")
+        self.ok_button.clicked.connect(self.accept)
+        self.layout.addWidget(self.ok_button)
+
+        self.setLayout(self.layout)
+
+    def get_selected_files(self):
+        selected_items = self.file_list_widget.selectedItems()
+        return [item.text() for item in selected_items]

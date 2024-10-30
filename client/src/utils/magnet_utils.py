@@ -3,7 +3,6 @@ from urllib.parse import urlparse, parse_qs
 
 import bencodepy
 
-
 class MagnetUtilsClass:
     @staticmethod
     def parse_magnet_link(magnet_link) -> tuple[str, str, str]:

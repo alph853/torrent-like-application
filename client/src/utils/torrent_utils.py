@@ -1,7 +1,25 @@
 import hashlib
 import os
 import struct
+import bencodepy
 
+def decode_bencode(bencoded_value):
+    if chr(bencoded_value[0]).isdigit():
+        first_colon_index = bencoded_value.find(b":")
+        if first_colon_index == -1:
+            raise ValueError("Invalid encoded value")
+        return bencoded_value[first_colon_index + 1:]
+    else:
+        bencoded_dict = bencodepy.decode(bencoded_value)
+        
+        # Convert byte keys to string keys
+        def convert_keys_to_str(data):
+            if isinstance(data, dict):
+                return {k.decode() if isinstance(k, bytes) else k: convert_keys_to_str(v) for k, v in data.items()}
+            elif isinstance(data, list):
+                return [convert_keys_to_str(i) for i in data]
+            return data
+        return convert_keys_to_str(bencoded_dict)
 
 class TorrentUtilsClass:
     @staticmethod
