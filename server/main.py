@@ -1,15 +1,19 @@
-from fastapi import FastAPI, Query, Request
+import base64
+import bencodepy
+from fastapi import FastAPI, Query, Request, Response
 from typing import List, Dict
 from fastapi.responses import JSONResponse
 
-from .database import Database, Torrent, Peer
-from .utils import to_compact, from_compact
-from .test import db
+from database import Database, Torrent, Peer
+from utils import to_compact
+from test import db
 
 app = FastAPI()
 
 TORRENT_DATABASE = Database()
 TORRENT_DATABASE = db
+
+INTERVAL = 60
 
 
 @app.get("/announce")
@@ -53,11 +57,17 @@ async def announce(
     # Return the list of peers to the requesting peer
     peer_list = TORRENT_DATABASE.get_torrent_peers(info_hash)
     peer_list = [p for p in peer_list if p.peer_id != peer_id]
-    if compact:
-        response = to_compact(peer_list)
-    else:
-        response = JSONResponse(content=peer_list)
-    return response
+    print(peer_list)
+
+    peers_response = to_compact(peer_list) if compact else peer_list
+
+    response = {
+        b'interval': INTERVAL,
+        b'peers': peers_response
+    }
+
+    response = bencodepy.encode(response)
+    return Response(content=response, media_type="application/octet-stream")
 
 
 @app.get("/")

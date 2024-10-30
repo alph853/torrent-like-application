@@ -1,4 +1,4 @@
-from .database import Database, Torrent, Peer
+from database import Database, Torrent, Peer
 
 # Create a sample database instance
 db = Database()

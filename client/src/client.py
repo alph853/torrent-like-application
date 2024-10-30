@@ -1,6 +1,7 @@
 import json
 from queue import Queue
 import socket
+import bencodepy
 import requests
 import os
 import threading
@@ -76,10 +77,12 @@ class TorrentClient:
             'compact': 1,
             'event': self.status
         }
-        response = requests.get(self.tracker_url, params=params)
-        peers = response.get['peers']
-        self.interval = response.get('interval', 0)
+        response = requests.get(self.tracker_url, params=params).content
+        response = bencodepy.decode(response)
+        peers = response.get[b'peers']
+        self.interval = response.get(b'interval', 0)
         self.peer_list = TorrentUtils.parse_compacted_peer_list(peers)
+        print(f"Interval: {self.interval} \nReceived peer list: {self.peer_list}")
 
     def init_connections(self):
         """Initiate connections to all peers in the peer list."""

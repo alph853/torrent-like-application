@@ -1,7 +1,7 @@
 import hashlib
 import os
 import struct
-from .database import Database, Torrent, Peer
+from database import Database, Torrent, Peer
 from typing import List, Dict, Tuple
 
 
@@ -19,7 +19,6 @@ def to_compact(peer_list: List[Peer]):
         compact_str += ip_bytes + port_bytes
 
     return compact_str
-
 
 # --------- FOR TESTING ------------
 def generate_peer_id(ip=None, port=None) -> str:

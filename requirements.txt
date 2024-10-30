@@ -1,5 +1,4 @@
 bencodepy
 fastapi[standard]
 pyqt6
-pyqt6-tools
 pyqt5designer
