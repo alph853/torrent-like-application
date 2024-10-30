@@ -115,23 +115,3 @@ class Database:
 
     def __repr__(self):
         return f"Database(Torrents: {len(self.torrents)}, Peers: {len(self.peers)})"
-
-
-SHA1_HASH_SIZE = 20
-STD_BLOCK_SIZE = 16 * 1024
-
-
-class TorrentMetainfo:
-    def __init__(self, metainfo: dict):
-        self.tracker_url: str = metainfo["announce"].decode()
-        self.info = metainfo["info"]
-        self.length: int = self.info["length"]
-        self.name: str = self.info["name"].decode()
-        self.piece_length: int = self.info["piece length"]
-        self.pieces: bytes = self.info["pieces"]
-        self.piece_hashes: list[bytes] = [
-            self.pieces[i: i + SHA1_HASH_SIZE]
-            for i in range(0, len(self.pieces), SHA1_HASH_SIZE)
-        ]
-        bencoded_info = bencodepy.encode(metainfo["info"])
-        self.info_hash: bytes = hashlib.sha1(bencoded_info).digest()

@@ -1,20 +1,22 @@
 from fastapi import FastAPI, Query, Request
 from typing import List, Dict
-from pydantic import BaseModel
-import uvicorn
-from hashlib import sha1
 from fastapi.responses import JSONResponse
+
 from .database import Database, Torrent, Peer
-from .utils import to_compact
+from .utils import to_compact, from_compact
+from .test import db
 
 app = FastAPI()
 
 TORRENT_DATABASE = Database()
+TORRENT_DATABASE = db
+
 
 @app.get("/announce")
 async def announce(
-    request: Request,
     info_hash: str,
+    ip: str,
+    port: int,
     peer_id: str,
     uploaded: int,
     downloaded: int,
@@ -26,7 +28,6 @@ async def announce(
     if TORRENT_DATABASE.get_torrent(info_hash) is None:
         return JSONResponse(content={"error": "Torrent not found"}, status_code=404)
 
-    ip, port = request.client.host, request.client.port
     peer = Peer(
         peer_id=peer_id,
         ip=ip,
@@ -51,6 +52,7 @@ async def announce(
 
     # Return the list of peers to the requesting peer
     peer_list = TORRENT_DATABASE.get_torrent_peers(info_hash)
+    peer_list = [p for p in peer_list if p.peer_id != peer_id]
     if compact:
         response = to_compact(peer_list)
     else:
@@ -58,24 +60,6 @@ async def announce(
     return response
 
 
-# @app.get("/scrape")
-# async def scrape(info_hash: str = Query(...)):
-#     """Handle GET requests to scrape data about a torrent."""
-#     info_hash_hex = sha1(info_hash.encode()).hexdigest()
-
-#     if info_hash_hex not in torrents:
-#         return JSONResponse(content={"error": "Torrent not found"}, status_code=404)
-
-#     # Count seeders and leechers
-#     seeders = sum(1 for peer in torrents[info_hash_hex] if peer["left"] == 0)
-#     leechers = sum(1 for peer in torrents[info_hash_hex] if peer["left"] > 0)
-
-#     return {
-#         "info_hash": info_hash_hex,
-#         "complete": seeders,   # Number of seeders
-#         "incomplete": leechers  # Number of leechers
-#     }
-
-# Run the server
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+@app.get("/")
+def read_root():
+    return {"Hello": "World"}

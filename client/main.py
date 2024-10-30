@@ -1,8 +1,8 @@
 from PyQt6.QtWidgets import *
-from widgets import AddFileDialog, ConfigForm
+from widgets import *
 from PyQt6.uic import loadUi
 import sys
-from utils import TorrentClient
+from src import TorrentClient
 
 
 class MainWindow(QMainWindow):
@@ -15,28 +15,24 @@ class MainWindow(QMainWindow):
         self.actionAdd_Magnet_Link.triggered.connect(self.add_magnet_link)
 
     def add_torrent_file(self):
-        title = "Add Torrent File"
-        label = "Enter the path to the torrent file:"
-        dialog = AddFileDialog(title, label)
+        dialog = AddFileDialogTorrent()
 
         if dialog.exec() == QDialog.DialogCode.Accepted:
             torrent_file_path = dialog.get_result()
+            client = TorrentClient(torrent_file_path=torrent_file_path)
 
     def add_magnet_link(self):
-        title = "Add Magnet Link"
-        label = "Enter the magnet link:"
-        dialog = AddFileDialog(title, label)
+        dialog = AddFileDialogMagnet()
 
         if dialog.exec() == QDialog.DialogCode.Accepted:
             magnet_link = dialog.get_result()
             client = TorrentClient(magnet_link=magnet_link)
-            config_form = ConfigForm(display_name=client.display_name,
-                                     file_names=tracker_response['files'], info=tracker_response['info'])
+            # config_form = ConfigForm(display_name=client.display_name,
+            #                          file_names=tracker_response['files'], info=tracker_response['info'])
 
-            if config_form.exec() == QDialog.DialogCode.Accepted:
-                chosen_files = config_form.get_selected_files()
-                print("Start the client with selected files", chosen_files)
-                client.start()
+            # if config_form.exec() == QDialog.DialogCode.Accepted:
+            #     chosen_files = config_form.get_selected_files()
+            #     print("Start the client with selected files", chosen_files)
 
 
 if __name__ == "__main__":

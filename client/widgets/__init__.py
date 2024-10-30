@@ -1,2 +1,2 @@
-from .add_file_dialog import AddFileDialog
-from .config_form import ConfigForm
+from .add_file_dialog import AddFileDialogMagnet, AddFileDialogTorrent
+from .config_form import ConfigForm, ConfigFormTorrent

@@ -76,3 +76,31 @@ class ConfigForm(QDialog):
             filename = self.checkbox_list.item(i).text()
             selected_files[filename] = (filename.checkState() == Qt.CheckState.Checked)
         return selected_files
+
+
+class ConfigFormTorrent(QDialog):
+    def __init__(self, display_name, file_names, info):
+        super().__init__()
+        self.setWindowTitle(display_name)
+        self.setGeometry(100, 100, 300, 400)
+
+        self.layout = QVBoxLayout()
+
+        self.label = QLabel("Select a file to download:")
+        self.layout.addWidget(self.label)
+
+        # Create a QListWidget to display file names
+        self.file_list_widget = QListWidget()
+        self.file_list_widget.addItems(file_names)  # Add file names to the list widget
+        self.layout.addWidget(self.file_list_widget)
+
+        # Add an OK button to confirm selection
+        self.ok_button = QPushButton("OK")
+        self.ok_button.clicked.connect(self.accept)
+        self.layout.addWidget(self.ok_button)
+
+        self.setLayout(self.layout)
+
+    def get_selected_files(self):
+        selected_items = self.file_list_widget.selectedItems()
+        return [item.text() for item in selected_items]
