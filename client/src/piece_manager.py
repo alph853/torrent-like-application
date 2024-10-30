@@ -1,5 +1,6 @@
 from queue import Queue
 from collections import Counter
+import numpy as np
 
 
 class PieceManager:
@@ -13,8 +14,8 @@ class PieceManager:
         self.metadata_size = metadata_size
         self.init_metadata_size(metadata_size, piece_size)
 
-        # self.peer_dict = {peer['id']: [] for peer in peer_list}
-        # self.piece_count = dict()
+        self.peer_dict = {peer['id']: [] for peer in peer_list}
+        self.piece_count = dict()
 
     def get_metadata_size(self):
         return self.metadata_size
@@ -49,14 +50,23 @@ class PieceManager:
 
     def add_peer_bitfield(self, peer_id, bitfield):
         bitfield = [int(b) for b in bitfield]
-        self.peer_dict[peer_id]['bitfield'] = bitfield
-        self.piece_count = {str(i): (sum(x) if sum(x) != 0 else float('inf'))
-                            for i, x in enumerate(zip(*self.peer_dict.values()))}
+        self.peer_dict[peer_id]['bitfield'] = bitfield           #{2:1,3:0}  bitfield : [1,0,1,1,0]
+        if not self.piece_count: 
+            self.piece_count = {i:bitfield[i] for i in range(len(bitfield))}
+        else: 
+            for i in self.piece_count.keys(): 
+                self.piece_count[i] += bitfield[i]
 
     def find_rarest(self):
         if not self.piece_count:
             return None
-        return self.piece_count.index(min(self.piece_count.values))
+        data = {k:v for (k,v) in self.piece_count.items() if v > 0} 
+        idx =  min(data, key=data.get)
+        peers = [k for (k,v) in self.peer_dict.items() if v[idx]]
+        return idx,peers
+        
 
-    def noti_piece_downloaded(self, idx):
-        self.piece_count[idx] = float('inf')
+
+    def delete_piece(self, indexes):
+        for i in indexes: 
+            self.piece_count.pop(i,None)
