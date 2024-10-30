@@ -29,6 +29,7 @@ class MainWindow(QMainWindow):
             print(torrent)
         file_names = [file["path"][0].decode('utf-8') for file in torrent["info"]["files"]]
         config_form = ConfigFormTorrent(display_name=torrent["info"]["name"].decode('utf-8'),file_names=file_names,info = torrent["info"])
+        chosen_file = None
         if config_form.exec() == QDialog.DialogCode.Accepted:
             chosen_file = config_form.get_selected_files()[0]
             print("Start the client with selected files", chosen_file)
