@@ -5,14 +5,15 @@ import requests
 import os
 import threading
 from .utils import TorrentUtils
-from .piece_manager import PieceManager
+from .piece_manager import PieceManagerP2P
 from .peer_connection import PeerConnection
 
 
 class TorrentClient:
-    def __init__(self, torrent_file=None, magnet_link=None):
+    def __init__(self, torrent_file=None,magnet_link=None,selected_file=None):
         self.magnet_link = magnet_link
         self.torrent_file = torrent_file
+        self.torrent_selected_file = selected_file
         self.status = 'started'
         self.peer_id = TorrentUtils.generate_peer_id()
         self.left = None
@@ -28,12 +29,10 @@ class TorrentClient:
         elif torrent_file: 
             params = TorrentUtils.parse_torrent_file(torrent_file)
             
-        self.info_hash = params['info_hash']
-        self.tracker_url = params['tracker_url']
-        self.display_name = params['display_name']
+        self.info_hash,self.tracker_url,self.display_name  = params
         self.interval, peer_list = self.send_tracker_request()
 
-        self.piece_manager = PieceManager(peer_list)
+        self.piece_manager = PieceManagerP2P(peer_list)
         
      
         

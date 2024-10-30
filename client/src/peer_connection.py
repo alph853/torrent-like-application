@@ -5,8 +5,8 @@ import threading
 from enum import Enum
 
 import bencodepy
-from .torrent_utils import TorrentUtils
-from .piece_manager import PieceManager
+from .utils import TorrentUtils
+from .piece_manager import PieceManagerP2P
 
 
 class MessageType(Enum):
@@ -30,7 +30,7 @@ class ExtensionMessageType(Enum):
 
 
 class PeerConnection:
-    def __init__(self, peer: dict, info_hash, piece_manager: PieceManager, extension_supported=False):
+    def __init__(self, peer: dict, info_hash, piece_manager: PieceManagerP2P, extension_supported=False):
         self.out_queue = Queue()
         self.in_queue = Queue()
 
@@ -144,7 +144,7 @@ class PeerConnection:
     def receive_metadata_data(self, metadata_id):
         """Receive the metadata data message from the peer."""
         try:
-            message = sock.recv(4096)
+            message = self.sock.recv(4096)
             if not message:
                 raise ConnectionError("Failed to receive metadata data message.")
             if len(message) < 6:

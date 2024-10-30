@@ -3,13 +3,14 @@ import struct
 import bencodepy
 import hashlib
 from urllib.parse import urlparse, parse_qs
+from PyQt6.QtWidgets import QDialog, QVBoxLayout,QListWidget, QPushButton,QLabel, QFileDialog
 
 def extract_pieces_hashes(pieces_hashes):
     index, result = 0, []
     while index < len(pieces_hashes):
-        result.append(pieces_hashes[index: index + 20].hex())
+        result.append(pieces_hashes[index: index + 20])
         index += 20
-        return result
+        return b''.join(result)
 
 class TorrentUtilsClass:
     @staticmethod
@@ -20,8 +21,8 @@ class TorrentUtilsClass:
     
     @staticmethod
     def compute_info_hash(torrent_data) -> bytes:
-        """Compute the SHA-1 hash of the info section of the torrent file."""
-        return hashlib.sha1(extract_pieces_hashes(torrent_data)).digest()
+        pieces_hashes = torrent_data['info']['pieces']  # Get pieces from the info section
+        return hashlib.sha1(extract_pieces_hashes(pieces_hashes)).digest()
 
     @staticmethod
     def parse_magnet_link(magnet_link) -> tuple[str, str, str]:
@@ -44,7 +45,8 @@ class TorrentUtilsClass:
     def parse_torrent_file(self,torrent_file)->tuple[str,str,str]:
         tracker_url = torrent_file["announce"].decode()
         display_name = torrent_file["info"]['name']
-        info_hash = self.compute_info_hash(torrent_file["info"]["pieces"])
+        info_hash = self.compute_info_hash(torrent_file)
+        return info_hash, tracker_url, display_name
         
 
     @staticmethod
@@ -72,7 +74,24 @@ class TorrentUtilsClass:
             reserved_bytes[5] = 0x10
         return bytes(reserved_bytes)
 
-
+def decode_bencode(bencoded_value):
+    if chr(bencoded_value[0]).isdigit():
+        first_colon_index = bencoded_value.find(b":")
+        if first_colon_index == -1:
+            raise ValueError("Invalid encoded value")
+        return bencoded_value[first_colon_index + 1:]
+    else:
+        bencoded_dict = bencodepy.decode(bencoded_value)
+        
+        # Convert byte keys to string keys
+        def convert_keys_to_str(data):
+            if isinstance(data, dict):
+                return {k.decode() if isinstance(k, bytes) else k: convert_keys_to_str(v) for k, v in data.items()}
+            elif isinstance(data, list):
+                return [convert_keys_to_str(i) for i in data]
+            return data
+        return convert_keys_to_str(bencoded_dict)
+    
 TorrentUtils = TorrentUtilsClass()
 
 print(type(TorrentUtils.generate_peer_id()))
@@ -80,3 +99,77 @@ magnet_link = "magnet:?xt=urn:btih:2b3b3f7e4e9d3f1e1f3f4e9d3f1e1f3f4e9d3f1&dn=ub
 magnet_params = TorrentUtils.parse_magnet_link(magnet_link)
 
 print(magnet_params)
+
+
+class AddFileDialogTorrent(QDialog):
+    def __init__(self, title, label):
+        super().__init__()
+        self.setWindowTitle(title)
+        self.setGeometry(100, 100, 300, 150)
+
+        self.layout = QVBoxLayout()
+        
+        self.label = QLabel(label)
+        self.layout.addWidget(self.label)
+
+        # Label to show the selected file name
+        self.file_name_label = QLabel("No file selected")
+        self.layout.addWidget(self.file_name_label)
+
+        # Button to browse for file
+        self.browse_button = QPushButton("Browse...")
+        self.browse_button.clicked.connect(self.browse_file)
+        self.layout.addWidget(self.browse_button)
+
+        # This will store the selected file path
+        self.selected_file = ""
+
+        # Add an OK button to confirm selection
+        self.ok_button = QPushButton("OK")
+        self.ok_button.clicked.connect(self.accept)
+        self.layout.addWidget(self.ok_button)
+
+        self.setLayout(self.layout)
+
+    def browse_file(self):
+        options = QFileDialog.Option(0)  # Create an instance of QFileDialog.Options
+        file_name, _ = QFileDialog.getOpenFileName(
+            self, 
+            "Select a .torrent file", 
+            "", 
+            "Torrent Files (*.torrent);;All Files (*)", 
+            options=options  # Pass the options here
+        )
+        if file_name:
+            self.selected_file = file_name
+            self.file_name_label.setText(f"Selected file: {file_name}") 
+
+    def get_result(self):
+        return self.selected_file
+
+class ConfigFormTorrent(QDialog):
+    def __init__(self, display_name, file_names, info):
+        super().__init__()
+        self.setWindowTitle(display_name)
+        self.setGeometry(100, 100, 300, 400)
+
+        self.layout = QVBoxLayout()
+
+        self.label = QLabel("Select a file to download:")
+        self.layout.addWidget(self.label)
+
+        # Create a QListWidget to display file names
+        self.file_list_widget = QListWidget()
+        self.file_list_widget.addItems(file_names)  # Add file names to the list widget
+        self.layout.addWidget(self.file_list_widget)
+
+        # Add an OK button to confirm selection
+        self.ok_button = QPushButton("OK")
+        self.ok_button.clicked.connect(self.accept)
+        self.layout.addWidget(self.ok_button)
+
+        self.setLayout(self.layout)
+
+    def get_selected_files(self):
+        selected_items = self.file_list_widget.selectedItems()
+        return [item.text() for item in selected_items]

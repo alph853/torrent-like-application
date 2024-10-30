@@ -261,7 +261,7 @@ QPushButton {
   </widget>
   <action name="actionAdd_Torrent_File">
    <property name="text">
-    <string>Add Torrent FIle ...</string>
+    <string>Add Torrent File ...</string>
    </property>
   </action>
   <action name="actionAdd_Magnet_Link">

@@ -2,9 +2,12 @@ from PyQt6.QtWidgets import *
 from widgets import AddFileDialog, ConfigForm
 from PyQt6.uic import loadUi
 import sys
-from utils import TorrentClient
+from src.client import TorrentClient
+from src.utils import decode_bencode, AddFileDialogTorrent, ConfigFormTorrent
 import bencodepy
+
 import hashlib
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -17,16 +20,23 @@ class MainWindow(QMainWindow):
 
     def add_torrent_file(self):
         title = "Add Torrent File"
-        label = "Enter the path to the torrent file:"
-        dialog = AddFileDialog(title, label)
-
+        label = "Select a .torrent file"
+        
+        dialog = AddFileDialogTorrent(title, label)
+        
         if dialog.exec() == QDialog.DialogCode.Accepted:
             torrent_file_path = dialog.get_result()
-            with open(torrent_file_path,"rb") as torrent_file: 
+            with open(torrent_file_path, "rb") as torrent_file:
                 bencoded_content = torrent_file.read()
 
             torrent = decode_bencode(bencoded_content)
-            client = TorrentClient(torrent_file=torrent)
+            print(torrent)
+        file_names = [file["path"][0].decode('utf-8') for file in torrent["info"]["files"]]
+        config_form = ConfigFormTorrent(display_name=torrent["info"]["name"].decode('utf-8'),file_names=file_names,info = torrent["info"])
+        if config_form.exec() == QDialog.DialogCode.Accepted:
+            chosen_file = config_form.get_selected_files()[0]
+            print("Start the client with selected files", chosen_file)
+        client = TorrentClient(torrent_file=torrent,selected_file=chosen_file)
             
             
             
