@@ -30,8 +30,9 @@ class MainWindow(QMainWindow):
                 bencoded_content = torrent_file.read()
 
             torrent = decode_bencode(bencoded_content)
-            print(torrent)
-        file_names = [file["path"][0].decode('utf-8') for file in torrent["info"]["files"]]
+            print('Pieces:', torrent["info"]["pieces"])
+        
+        file_names = [file["path"][-1].decode('utf-8') for file in torrent["info"]["files"]]
         config_form = ConfigFormTorrent(display_name=torrent["info"]["name"].decode('utf-8'),file_names=file_names,info = torrent["info"])
         if config_form.exec() == QDialog.DialogCode.Accepted:
             chosen_file = config_form.get_selected_files()[0]
