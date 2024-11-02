@@ -3,6 +3,8 @@ from urllib.parse import urlparse, parse_qs
 
 import bencodepy
 
+from .config import MessageType
+
 class MagnetUtilsClass:
     @staticmethod
     def parse_magnet_link(magnet_link) -> tuple[str, str, str]:
@@ -29,12 +31,12 @@ class MagnetUtilsClass:
         return bytes(reserved_bytes)
 
     @staticmethod
-    def construct_extension_payload(message_id, message, extension_message_id) -> bytes:
+    def construct_extension_payload(message, extension_message_id) -> bytes:
         """Construct a payload for an extension message."""
         bencoded_message = bencodepy.encode(message)
         message_length = len(bencoded_message) + 2
         payload = (
-            struct.pack(">Ib", message_length, message_id)
+            struct.pack(">Ib", message_length, MessageType.EXTENDED.value)
             + struct.pack("B", extension_message_id)
             + bencoded_message
         )

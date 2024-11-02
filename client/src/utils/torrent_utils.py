@@ -11,7 +11,7 @@ def decode_bencode(bencoded_value):
         return bencoded_value[first_colon_index + 1:]
     else:
         bencoded_dict = bencodepy.decode(bencoded_value)
-        
+
         # Convert byte keys to string keys
         def convert_keys_to_str(data):
             if isinstance(data, dict):
@@ -67,5 +67,9 @@ class TorrentUtilsClass:
             peer_list.append(peer_dict)
         return peer_list
 
+    def get_metadata_info(self, metadata):
+        if not metadata:
+            return None
+        return decode_bencode(metadata)
 
 TorrentUtils = TorrentUtilsClass()
