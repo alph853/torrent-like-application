@@ -7,8 +7,8 @@ from .config import MessageType
 
 class MagnetUtilsClass:
     @staticmethod
-    def parse_magnet_link(magnet_link) -> tuple[str, str, str]:
-        """Parse a magnet link and extract the info_hash, tracker_url, display_name (in bytes).
+    def parse_magnet_link(magnet_link) -> tuple[str, str, str, str]:
+        """Parse a magnet link and extract the info_hash, tracker_url, display_name, metadata (None).
         Anything not found will be set to None.
         """
         if not magnet_link.startswith("magnet:?"):
@@ -19,8 +19,9 @@ class MagnetUtilsClass:
         info_hash = params.get("xt", [None])[0]  # urn:btih: followed by the info hash
         display_name = params.get("dn", [None])[0]  # The display name
         tracker_url = params.get("tr", [None])[0]  # The tracker URL
+        metadata = None
 
-        return info_hash, tracker_url, display_name
+        return info_hash, tracker_url, display_name, metadata
 
     @staticmethod
     def get_reserved_bytes(extension_handshake=False) -> bytes:

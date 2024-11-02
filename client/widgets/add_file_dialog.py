@@ -104,6 +104,10 @@ class AddFileDialogTorrent(QDialog):
     def get_result(self):
         return self.result
 
+
+class UploadFilesDialog(QDialog):
+    pass
+
 class ConfigFormTorrent(QDialog):
     def __init__(self, display_name, file_names, info):
         super().__init__()

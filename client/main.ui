@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1362</width>
-    <height>968</height>
+    <width>1360</width>
+    <height>961</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -141,7 +141,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1362</width>
+     <width>1360</width>
      <height>22</height>
     </rect>
    </property>
@@ -149,6 +149,7 @@
     <property name="title">
      <string>File</string>
     </property>
+    <addaction name="action_Upload_Files"/>
     <addaction name="actionAdd_Torrent_File"/>
     <addaction name="actionAdd_Magnet_Link"/>
    </widget>
@@ -287,6 +288,11 @@ QPushButton {
   <action name="actionResume">
    <property name="text">
     <string>Resume</string>
+   </property>
+  </action>
+  <action name="action_Upload_Files">
+   <property name="text">
+    <string>Upload Files</string>
    </property>
   </action>
  </widget>
