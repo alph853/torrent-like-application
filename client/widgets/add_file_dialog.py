@@ -106,7 +106,70 @@ class AddFileDialogTorrent(QDialog):
 
 
 class UploadFilesDialog(QDialog):
-    pass
+    def __init__(self):
+        super().__init__()
+        width = 500
+        height = 120
+
+        options = QFileDialog.Option(0)  # Create an instance of QFileDialog.Options
+        file_names, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Select files",
+            "",
+            "All Files (*)",
+            options=options  # Pass the options here
+        )
+        if file_names:
+            self.selected_files = file_names
+
+            self.setWindowTitle("Upload files: ")
+            self.setFixedSize(width, height)
+
+            layout = QVBoxLayout()
+
+            label = QLabel("Chosen files:")
+
+            browse_layout = QHBoxLayout()
+            self.filename_line = QLineEdit(", ".join(file_names))
+
+            # Button to browse for files
+            browse_button = QPushButton("Browse...")
+            browse_button.clicked.connect(self.browse_files)
+            browse_layout.addWidget(self.filename_line)
+            browse_layout.addWidget(browse_button)
+
+            # Add an OK button to confirm selection
+            button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
+                                          QDialogButtonBox.StandardButton.Cancel)
+            button_box.accepted.connect(self.accept)
+            button_box.rejected.connect(self.reject)
+
+            layout.addWidget(label)
+            layout.addLayout(browse_layout)
+            layout.addWidget(button_box)
+
+            self.setLayout(layout)
+
+    def browse_files(self):
+        options = QFileDialog.Option(0)  # Create an instance of QFileDialog.Options
+        file_names, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Select files",
+            "",
+            "All Files (*)",
+            options=options  # Pass the options here
+        )
+        if file_names:
+            self.selected_files = file_names
+            self.filename_line.setText(", ".join(file_names))
+
+    def accept(self):
+        self.result = self.selected_files
+        self.done(1)
+
+    def get_result(self):
+        return self.result
+
 
 class ConfigFormTorrent(QDialog):
     def __init__(self, display_name, file_names, info):
