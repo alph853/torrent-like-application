@@ -19,3 +19,7 @@ class ExtensionMessageType(Enum):
     REQUEST = 0
     DATA = 1
     REJECT = 2
+
+
+GLOBAL_TERMINAL = "Welcome to BitTorrent Client\n"
+GLOBAL_TERMINAL += "Type 'help' to see available commands\n"

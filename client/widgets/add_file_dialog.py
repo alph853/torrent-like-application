@@ -191,7 +191,7 @@ class CreateTorrentDialog(QDialog):
         # Fields for tracker URLs, web seed URLs, comments, and source
         fields_layout = QFormLayout()
 
-        self.tracker_urls = QLineEdit()
+        self.tracker_urls = QTextEdit()
         fields_layout.addRow("Tracker URLs:", self.tracker_urls)
 
         save_torrent_dir_layout = QHBoxLayout()
@@ -290,6 +290,8 @@ class CreateTorrentDialog(QDialog):
         self.done(1)
 
     def get_result(self):
+        magnet_text = b''
+        dialog = QDialog()
         return self.result
 
 

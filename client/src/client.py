@@ -136,6 +136,7 @@ class TorrentClient:
 
     def send_tracker_request_periodic(self):
         # Send a request to the tracker, initialize peer_list and interval
+        time.sleep(self.interval)
         while self.running:
             params = {
                 'ip': self.ip,
@@ -182,6 +183,13 @@ class TorrentClient:
 
     def is_metadata_complete(self):
         return self.piece_manager.is_metadata_complete()
+
+    def get_progress(self) -> list[dict[str, int]]:
+        """Get the progress of the download in percentage."""
+        pass
+
+    def get_peers(self) -> list[tuple[str, int]]:
+        pass
 
     def start_downloading(self):
         """Start downloading pieces. If metdata is not fully downloaded yet, the thread will be in busy waiting.

@@ -120,10 +120,10 @@ class TorrentUtilsClass:
             files = []
             for root, _, file_names in os.walk(file_path):
                 for file_name in file_names:
-                    file_path = os.path.join(root, file_name)
-                    files.append(generate_file_dictionary(file_path))
+                    p = os.path.join(root, file_name)
+                    files.append(generate_file_dictionary(p))
 
-                    file_content = open(file_path, 'rb').read()
+                    file_content = open(p, 'rb').read()
                     pieces += file_content
                     pieces_hash += hashlib.sha1(file_content).digest()
         else:
