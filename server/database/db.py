@@ -30,11 +30,8 @@ class Peer:
 
 
 class Torrent:
-    def __init__(self, info_hash: str, name: str, length: int, files: List[str]):
+    def __init__(self, info_hash: str):
         self.info_hash = info_hash  # SHA-1 hash of the torrent's info section
-        self.name = name            # Name of the torrent
-        self.length = length        # Total size of the torrent
-        self.files = files          # List of file names in the torrent
         self.seeders_id_list = []   # List of peer IDs that are seeders
         self.leechers_id_list = []  # List of peer IDs that are leechers
         self.peer_list: List[Peer] = []  # List of all peers participating in this torrent
@@ -54,7 +51,7 @@ class Torrent:
         self.leechers_id_list = [pid for pid in self.leechers_id_list if pid != peer_id]
 
     def __repr__(self):
-        return f"Torrent({self.name}, seeders={len(self.seeders_id_list)}, leechers={len(self.leechers_id_list)})"
+        return f"Torrent({self.info_hash}, seeders={len(self.seeders_id_list)}, leechers={len(self.leechers_id_list)})"
 
 
 class Database:
@@ -93,7 +90,7 @@ class Database:
 
     def update_peer(self, peer: Peer):
         """Update an existing peer's data."""
-        peer_key = f"{peer.eer_id}-{peer.info_hash}"
+        peer_key = f"{peer.peer_id}-{peer.info_hash}"
         if peer_key in self.peers:
             peer = self.peers[peer_key]
             peer.update_announce(peer.uploaded, peer.downloaded, peer.left, peer.status)

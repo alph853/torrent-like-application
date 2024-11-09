@@ -11,10 +11,10 @@ lock = threading.Lock()
 
 
 class DownloadingFSM(enumerate):
-    META_DOWN, PIECE_FIND, PIECE_REQ, PIECE_REQ_DONE, DOWN_DONE = range(5)
+    META_DOWN, PIECE_FIND, PIECE_REQ, PIECE_REQ_DONE, DOWN_DONE, SEEDING = range(6)
 
 class PieceManager:
-    def __init__(self, peer_list, piece_size=512*1024, block_size=64*1024, metadata: dict = None):
+    def __init__(self, peer_list, metadata: dict, pieces: dict, piece_size=512*1024, block_size=16*1024):
         self.piece_size = piece_size
         self.block_size = block_size
         self.metadata = metadata
@@ -23,6 +23,9 @@ class PieceManager:
             self.state = DownloadingFSM.PIECE_FIND
             self.metadata_pieces, self.metadata_size = self.split_metadata(metadata, piece_size)
             self.metadata_piece_count = self.metadata_size // piece_size + (1 if self.metadata_size % piece_size else 0)
+            if pieces:
+                print('Pieces are already downloaded')
+                self.state = DownloadingFSM.SEEDING
         else:
             self.state = DownloadingFSM.META_DOWN
             self.needed_metadata_pieces = None
@@ -33,7 +36,7 @@ class PieceManager:
             self.metadata_piece_count = None
 
         self.piece_counter = dict()             # Counter of pieces that held by the client
-        self.pieces = dict()                    # Pieces the client holds
+        self.pieces = pieces                    # Pieces the client holds
 
         self.requesting_blocks = dict()
         self.requesting_piece = None
@@ -49,6 +52,12 @@ class PieceManager:
         self.optimistic_unchoked_peer = None
         self.unchoked_peers = []
         self.interest_peers = []
+
+    def is_done_downloading(self):
+        return self.state == DownloadingFSM.DOWN_DONE
+
+    def is_seeding(self):
+        return self.state == DownloadingFSM.SEEDING
 
     def split_metadata(self, metadata: dict, piece_size) -> tuple[dict, int]:
         metadata = bencodepy.encode(metadata)

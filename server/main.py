@@ -16,6 +16,11 @@ TORRENT_DATABASE = db
 INTERVAL = 60
 
 
+@app.get("/")
+async def read_root():
+    return 'xyz'
+
+
 @app.get("/announce")
 async def announce(
     info_hash: str,
@@ -30,7 +35,8 @@ async def announce(
 ):
     """Handle GET requests from peers announcing their status to the tracker."""
     if TORRENT_DATABASE.get_torrent(info_hash) is None:
-        return JSONResponse(content={"error": "Torrent not found"}, status_code=404)
+        torrent = Torrent(info_hash=info_hash)
+        TORRENT_DATABASE.add_torrent(torrent)
 
     peer = Peer(
         peer_id=peer_id,

@@ -90,7 +90,7 @@ class TorrentUtilsClass:
         return extension_supported, peer_id
 
     @staticmethod
-    def divide_piece_into_blocks(piece_index, piece_size, block_size=64*1024):
+    def divide_piece_into_blocks(piece_index, piece_size, block_size=16*1024):
         """
         Divide a piece into blocks and prepare request arguments for each block.
         """
@@ -104,6 +104,57 @@ class TorrentUtilsClass:
 
         return args_list
 
+    @staticmethod
+    def generate_info_dictionary(file_path, piece_size=512*1024) -> tuple[dict, bytes]:
+        """Generate the info dictionary and pieces used for downloading"""
+        def generate_file_dictionary(file_path):
+            file_size = os.path.getsize(file_path)
+            return {
+                'length': file_size,
+                'path': file_path.split(os.sep)
+            }
+
+        pieces_hash = b''
+        pieces = b''
+        if os.path.isdir(file_path):
+            files = []
+            for root, _, file_names in os.walk(file_path):
+                for file_name in file_names:
+                    file_path = os.path.join(root, file_name)
+                    files.append(generate_file_dictionary(file_path))
+
+                    file_content = open(file_path, 'rb').read()
+                    pieces += file_content
+                    pieces_hash += hashlib.sha1(file_content).digest()
+        else:
+            files = [generate_file_dictionary(file_path)]
+
+        return {
+            'piece length': piece_size,
+            'pieces': pieces_hash,
+            'name': os.path.basename(file_path),
+            'files': files
+        }, pieces
+
+    def parse_uploaded_torrent(self, uploader_info: dict, piece_size=512*1024) -> tuple[str, dict, dict]:
+        """ Parse the uploaded torrent information and return metadata and pieces"""
+        tracker_url = uploader_info['tracker_url']
+        save_torrent_dir = uploader_info['save_torrent_dir']
+        upload_dir = uploader_info['upload_dir']
+
+        metadata, pieces = self.generate_info_dictionary(upload_dir, piece_size)
+        torrent_file = {
+            'announce': tracker_url,
+            'info': metadata
+        }
+        with open(os.path.join(save_torrent_dir, f'{metadata['name']}.torrent'), 'wb') as f:
+            f.write(bencodepy.encode(torrent_file))
+
+        pieces_dict = dict(enumerate(pieces[i:i+piece_size] for i in range(0, len(pieces), piece_size)))
+        info_hash = self.compute_info_hash(torrent_file)
+        display_name = metadata['name']
+
+        return info_hash, tracker_url, display_name, metadata, pieces_dict
 
 
 TorrentUtils = TorrentUtilsClass()

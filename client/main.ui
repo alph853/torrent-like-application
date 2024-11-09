@@ -149,7 +149,6 @@
     <property name="title">
      <string>File</string>
     </property>
-    <addaction name="action_Upload_Files"/>
     <addaction name="actionAdd_Torrent_File"/>
     <addaction name="actionAdd_Magnet_Link"/>
    </widget>
@@ -162,8 +161,15 @@
     <addaction name="actionPause_All"/>
     <addaction name="actionRun_all"/>
    </widget>
+   <widget class="QMenu" name="menuTools">
+    <property name="title">
+     <string>Tools</string>
+    </property>
+    <addaction name="actionCreate_Torrent_2"/>
+   </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
+   <addaction name="menuTools"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <widget class="QDockWidget" name="dockWidget">
@@ -290,9 +296,14 @@ QPushButton {
     <string>Resume</string>
    </property>
   </action>
-  <action name="action_Upload_Files">
+  <action name="actionCreate_Torrent">
    <property name="text">
-    <string>Upload Files</string>
+    <string>Create Torrent</string>
+   </property>
+  </action>
+  <action name="actionCreate_Torrent_2">
+   <property name="text">
+    <string>Create Torrent</string>
    </property>
   </action>
  </widget>
