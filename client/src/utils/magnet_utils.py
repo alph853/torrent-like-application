@@ -45,9 +45,3 @@ class MagnetUtilsClass:
 
 
 MagnetUtils = MagnetUtilsClass()
-
-# print(type(MagnetUtils.generate_peer_id()))
-# magnet_link = "magnet:?xt=urn:btih:2b3b3f7e4e9d3f1e1f3f4e9d3f1e1f3f4e9d3f1&dn=ubuntu-20.04-desktop-amd64.iso&tr=udp://tracker.opentrackr.org:1337/announce"
-# magnet_params = MagnetUtils.parse_magnet_link(magnet_link)
-
-# print(magnet_params)

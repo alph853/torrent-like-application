@@ -107,27 +107,29 @@ class TorrentUtilsClass:
     @staticmethod
     def generate_info_dictionary(file_path, piece_size=512*1024) -> tuple[dict, bytes]:
         """Generate the info dictionary and pieces used for downloading"""
-        def generate_file_dictionary(file_path):
-            file_size = os.path.getsize(file_path)
+        def generate_file_dictionary(root, path: str):
+            length = os.path.getsize(path)
+            path = path.split(os.sep)
+            path.remove(root)
             return {
-                'length': file_size,
-                'path': file_path.split(os.sep)
+                'length': length,
+                'path': path
             }
 
         pieces_hash = b''
         pieces = b''
         if os.path.isdir(file_path):
             files = []
-            for root, _, file_names in os.walk(file_path):
+            for root, dirnames, file_names in os.walk(file_path):
                 for file_name in file_names:
                     p = os.path.join(root, file_name)
-                    files.append(generate_file_dictionary(p))
+                    files.append(generate_file_dictionary(file_path, p))
 
                     file_content = open(p, 'rb').read()
                     pieces += file_content
                     pieces_hash += hashlib.sha1(file_content).digest()
         else:
-            files = [generate_file_dictionary(file_path)]
+            files = [generate_file_dictionary(file_path, file_path)]
 
         return {
             'piece length': piece_size,
@@ -143,18 +145,91 @@ class TorrentUtilsClass:
         upload_dir = uploader_info['upload_dir']
 
         metadata, pieces = self.generate_info_dictionary(upload_dir, piece_size)
-        torrent_file = {
-            'announce': tracker_url,
-            'info': metadata
-        }
-        with open(os.path.join(save_torrent_dir, f'{metadata['name']}.torrent'), 'wb') as f:
-            f.write(bencodepy.encode(torrent_file))
+        torrent_file = self.generate_torrent_file(tracker_url, metadata, save_torrent_dir)
 
         pieces_dict = dict(enumerate(pieces[i:i+piece_size] for i in range(0, len(pieces), piece_size)))
         info_hash = self.compute_info_hash(torrent_file)
         display_name = metadata['name']
 
+        self.generate_magnet_link(info_hash, tracker_url, display_name, save_torrent_dir)
         return info_hash, tracker_url, display_name, metadata, pieces_dict
 
+    @staticmethod
+    def generate_torrent_file(tracker_url, metadata, save_torrent_dir=None):
+        torrent_file = {
+            'announce': tracker_url,
+            'info': metadata
+        }
+        if save_torrent_dir:
+            with open(os.path.join(save_torrent_dir, f'{metadata['name']}.torrent'), 'wb') as f:
+                f.write(bencodepy.encode(torrent_file))
+
+        return torrent_file
+
+    @staticmethod
+    def generate_magnet_link(info_hash, tracker_url, display_name, save_torrent_dir=None):
+        magnet_link = f"magnet:?xt=urn:btih:{info_hash.hex()}&dn={display_name}&tr={tracker_url}/announce"
+        if save_torrent_dir:
+            with open(os.path.join(save_torrent_dir, f'{display_name}.txt'), 'w') as f:
+                f.write(magnet_link)
+
+        return magnet_link
+
+    @staticmethod
+    def piece2file_map(files, piece_size):
+        """Maps each piece to the corresponding file(s), handling pieces that span multiple files.
+        """
+        piece_to_file_map = dict()
+        current_file_index = 0
+        current_file_offset = 0
+        current_piece = 0
+
+        # Iterate through each piece
+        while True:
+            piece_remaining = piece_size  # Track remaining bytes to map in the current piece
+            piece_to_file_map[current_piece] = []
+
+            # Continue mapping until the entire piece is accounted for
+            while piece_remaining > 0:
+                # Get current file info
+                current_file = files[current_file_index]
+                file_name = current_file["path"]
+                file_length = current_file["length"]
+
+                # Calculate how much data can fit in the current file
+                available_in_file = file_length - current_file_offset
+
+                if piece_remaining <= available_in_file:
+                    # The piece fits within the remaining part of the current file
+                    piece_to_file_map[current_piece].append({
+                        "file": os.path.join(*file_name),
+                        "length_in_file": piece_remaining,
+                        # "is_last": piece_remaining == available_in_file
+                    })
+                    current_file_offset += piece_remaining
+                    piece_remaining = 0  # Entire piece is mapped
+
+                    # Move to the next file if the current file is exhausted
+                    if current_file_offset >= file_length:
+                        current_file_index += 1
+                else:
+                    # The piece spans into the next file
+                    piece_to_file_map[current_piece].append({
+                        "file": os.path.join(*file_name),
+                        "length_in_file": available_in_file,
+                        # "is_last": True  # This is the last part of the piece within this file
+                    })
+                    piece_remaining -= available_in_file
+                    current_file_index += 1
+                    current_file_offset = 0
+
+                if current_file_index >= len(files):
+                    break
+            if current_file_index >= len(files):
+                break
+
+            current_piece += 1  # Move to the next piece
+
+        return piece_to_file_map
 
 TorrentUtils = TorrentUtilsClass()

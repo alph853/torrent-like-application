@@ -52,7 +52,7 @@ async def announce(
     if event == "started":
         TORRENT_DATABASE.add_peer(peer)
         print(f"peer {peer_id} has joined the swarm")
-    elif event == "completed":
+    elif event == "completed" or event is None:
         peer.left = 0
         TORRENT_DATABASE.update_peer(peer)
         print(f"peer {peer_id} has began seeding")
@@ -76,6 +76,22 @@ async def announce(
     return Response(content=response, media_type="application/octet-stream")
 
 
-@app.get("/")
-def read_root():
-    return {"Hello": "World"}
+@app.get("/peers")
+async def get_peers(info_hash: str):
+    """Return a list of peers for a given torrent."""
+    peers = TORRENT_DATABASE.get_torrent_peers(info_hash)
+    return JSONResponse(content=peers)
+
+
+@app.get('/torrents')
+async def get_torrents():
+    """Return a list of all torrents."""
+    torrents = TORRENT_DATABASE.get_torrent()
+    return JSONResponse(content=torrents)
+
+
+@app.get("/peers")
+async def get_peers(info_hash: str):
+    """Return a list of peers for a given torrent."""
+    peers = TORRENT_DATABASE.get_torrent_peers(info_hash)
+    return JSONResponse(content=peers)

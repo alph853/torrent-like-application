@@ -21,5 +21,5 @@ class ExtensionMessageType(Enum):
     REJECT = 2
 
 
-GLOBAL_TERMINAL = "Welcome to BitTorrent Client\n"
-GLOBAL_TERMINAL += "Type 'help' to see available commands\n"
+INIT_STRING = "----------- Simple BitTorrent Application -----------\n"
+INIT_STRING += '-' * len(INIT_STRING) + '\n\n\n'

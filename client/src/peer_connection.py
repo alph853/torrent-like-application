@@ -26,22 +26,18 @@ class PeerConnection:
 
         self.sock = sock
         self.init_connection()
-        self.interest = True
+        self.peer_not_interest = True      # peer has downloaded everything, not interested in any more pieces
+        self.send_to_console = ""
 
     def init_connection(self):
         """Establish connection to the peer and start send/receive threads."""
-        try:
-            print(f"Connected to peer at {self.ip}:{self.port}")
-            self.sock.connect((self.ip, self.port))
+        self.sock.connect((self.ip, self.port))
 
-            in_thread = threading.Thread(target=self.process_recv_messages, daemon=True)
-            in_thread.start()
+        self.in_thread = threading.Thread(target=self.process_recv_messages, daemon=True)
+        self.in_thread.start()
 
-            out_thread = threading.Thread(target=self.process_send_messages, daemon=True)
-            out_thread.start()
-
-        except Exception as e:
-            print(f"Failed to connect to peer {self.peer_id}: {e}")
+        self.out_thread = threading.Thread(target=self.process_send_messages, daemon=True)
+        self.out_thread.start()
 
     def send_handshake_message(self, info_hash, my_id, outgoing):
         """Send base handshake message. Send an extension message if the peer supports the extension protocol."""
@@ -216,8 +212,7 @@ class PeerConnection:
                     case _:
                         print(f"Unhandled message type: {message[4]}")
             except (ConnectionError, ValueError) as e:
-                print(f"Error receiving message: {e}")
-                self.queue_running = False
+                print(f"Error receiving message: {e}, message: {message}")
 
     def send_bitfield_message(self):
         """Send a bitfield message to the peer."""
@@ -256,7 +251,7 @@ class PeerConnection:
 
     def handle_request_message(self, message):
         """Handle a request message from the peer."""
-        if not self.interest:
+        if self.peer_not_interest:
             return
         else:
             index, begin, length = struct.unpack(">III", message[5:])
@@ -303,12 +298,13 @@ class PeerConnection:
 
     def handle_not_interested_message(self):
         """Handle a not interested message from the peer."""
-        self.interest = False
+        self.peer_not_interest = True
 
     def enqueue_send_message(self, message):
         """Enqueue a message to be sent to the peer."""
         self.out_queue.put(message)
 
     def seeding(self):
-        """Terminate the connection and stop the send/receive threads."""
+        """Terminate the connection and stop the send threads."""
+        self.out_thread.join()
         self.send_not_interested_message()

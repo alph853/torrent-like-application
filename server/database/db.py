@@ -98,13 +98,12 @@ class Database:
         else:
             print(f"Peer {peer.peer_id} not found!")
 
-    def get_torrent_peers(self, info_hash: str) -> List[Peer]:
+    def get_torrent_peers(self, info_hash: str) -> List[Peer] | None:
         """Retrieve all peers for a specific torrent."""
         if info_hash in self.torrents:
             return self.torrents[info_hash].peer_list
         else:
-            print(f"Torrent with info_hash {info_hash} not found.")
-            return []
+            return None
 
     def get_torrent(self, info_hash: str) -> Torrent:
         """Retrieve a torrent by info_hash."""
