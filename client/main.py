@@ -57,14 +57,14 @@ class MainWindow(QMainWindow):
 
     def display_client_UI(self, client: TorrentClient):
         """Display the client in the UI."""
-        threading.Thread(target=self.display_console, daemon=True, args=(client, )).start()
-        while True:
-            if not client.is_metadata_complete():
-                self.display_loading_screen()
-            else:
-                self.display_torrent_screen(client)
-                threading.Thread(target=self.display_download_progress, daemon=True, args=(client, )).start()
-                threading.Thread(target=self.display_peers, daemon=True, args=(client, )).start()
+        # threading.Thread(target=self.display_console, daemon=True, args=(client, )).start()
+        # while True:
+        #     if not client.is_metadata_complete():
+        #         self.display_loading_screen()
+        #     else:
+        #         self.display_torrent_screen(client)
+        #         threading.Thread(target=self.display_download_progress, daemon=True, args=(client, )).start()
+        #         threading.Thread(target=self.display_peers, daemon=True, args=(client, )).start()
 
     def display_console(self, client: TorrentClient):
         self.console.append(client.get_console_output())

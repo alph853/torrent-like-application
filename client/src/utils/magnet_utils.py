@@ -35,7 +35,7 @@ class MagnetUtilsClass:
     def construct_extension_payload(message, extension_message_id) -> bytes:
         """Construct a payload for an extension message."""
         bencoded_message = bencodepy.encode(message)
-        message_length = len(bencoded_message) + 2
+        message_length = len(bencoded_message) + 6
         payload = (
             struct.pack(">Ib", message_length, MessageType.EXTENDED.value)
             + struct.pack("B", extension_message_id)

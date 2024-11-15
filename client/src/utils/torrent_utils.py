@@ -96,7 +96,7 @@ class TorrentUtilsClass:
         return extension_supported, peer_id
 
     @staticmethod
-    def divide_piece_into_blocks(piece_index, piece_size, block_size=16*1024):
+    def divide_piece_into_blocks(piece_index, piece_size, block_size=64*1024):
         """
         Divide a piece into blocks and prepare request arguments for each block.
         """
@@ -111,18 +111,19 @@ class TorrentUtilsClass:
         return args_list
 
     @staticmethod
-    def generate_info_dictionary(file_path, piece_size=512*1024) -> tuple[dict, bytes]:
+    def generate_info_dictionary(file_path, piece_size=512*1024) -> tuple[dict, dict]:
         """Generate the info dictionary and pieces used for downloading"""
         def generate_file_dictionary(root, path: str):
             length = os.path.getsize(path)
             path = path.split(os.sep)
             path.remove(root)
+            if path == []:
+                path = [os.path.basename(root)]
             return {
                 'length': length,
                 'path': path
             }
 
-        pieces_hash = b''
         pieces = b''
         if os.path.isdir(file_path):
             files = []
@@ -133,16 +134,20 @@ class TorrentUtilsClass:
 
                     file_content = open(p, 'rb').read()
                     pieces += file_content
-                    pieces_hash += hashlib.sha1(file_content).digest()
         else:
             files = [generate_file_dictionary(file_path, file_path)]
 
-        return {
+        pieces_dict = dict(enumerate(pieces[i:i+piece_size] for i in range(0, len(pieces), piece_size)))
+        pieces_hash = b''.join([hashlib.sha1(pieces_dict[k]).digest() for k in sorted(pieces_dict.keys())])
+
+        metadata = {
             'piece length': piece_size,
             'pieces': pieces_hash,
             'name': os.path.basename(file_path),
             'files': files
-        }, pieces
+        }
+
+        return metadata, pieces_dict
 
     def parse_uploaded_torrent(self, uploader_info: dict, piece_size=512*1024) -> tuple[str, dict, dict]:
         """ Parse the uploaded torrent information and return metadata and pieces"""
@@ -150,10 +155,9 @@ class TorrentUtilsClass:
         save_torrent_dir = uploader_info['save_torrent_dir']
         upload_dir = uploader_info['upload_dir']
 
-        metadata, pieces = self.generate_info_dictionary(upload_dir, piece_size)
+        metadata, pieces_dict = self.generate_info_dictionary(upload_dir, piece_size)
         torrent_file = self.generate_torrent_file(tracker_url, metadata, save_torrent_dir)
 
-        pieces_dict = dict(enumerate(pieces[i:i+piece_size] for i in range(0, len(pieces), piece_size)))
         info_hash = self.compute_info_hash(torrent_file).hex()
         display_name = metadata['name']
 
