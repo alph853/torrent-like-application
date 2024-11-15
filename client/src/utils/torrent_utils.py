@@ -53,10 +53,16 @@ class TorrentUtilsClass:
             bencoded_content = torrent_file.read()
         torrent_content = self.decode_bencode(bencoded_content)
 
-        tracker_url = torrent_content["announce"].decode()
-        display_name = torrent_content["info"]['name']
-        info_hash = self.compute_info_hash(torrent_content)
         metadata = torrent_content['info']
+        files = metadata['files']
+        for file in files:
+            file['path'] = [e.decode('utf-8') for e in file['path']]
+        metadata['name'] = metadata['name'].decode('utf-8')
+
+        tracker_url = torrent_content["announce"].decode()
+        display_name = metadata['name']
+        info_hash = self.compute_info_hash(torrent_content).hex()
+
 
         return info_hash, tracker_url, display_name, metadata
 
@@ -82,11 +88,11 @@ class TorrentUtilsClass:
     def receive_and_validate_handshake(sock, info_hash):
         handshake = sock.recv(68)
         extension_supported = bool(handshake[25] & 0x10)
-        handshake_info_hash = handshake[28:48]
+        handshake_info_hash = handshake[28:48].hex()
         peer_id = handshake[48:].hex()
 
         if handshake_info_hash != info_hash:
-            raise ValueError('Different info hash and peer id. Connection Severed.')
+            raise ValueError(f'Different info hash. Connection Severed. {handshake_info_hash} != {info_hash}')
         return extension_supported, peer_id
 
     @staticmethod
@@ -148,7 +154,7 @@ class TorrentUtilsClass:
         torrent_file = self.generate_torrent_file(tracker_url, metadata, save_torrent_dir)
 
         pieces_dict = dict(enumerate(pieces[i:i+piece_size] for i in range(0, len(pieces), piece_size)))
-        info_hash = self.compute_info_hash(torrent_file)
+        info_hash = self.compute_info_hash(torrent_file).hex()
         display_name = metadata['name']
 
         self.generate_magnet_link(info_hash, tracker_url, display_name, save_torrent_dir)
@@ -168,7 +174,7 @@ class TorrentUtilsClass:
 
     @staticmethod
     def generate_magnet_link(info_hash, tracker_url, display_name, save_torrent_dir=None):
-        magnet_link = f"magnet:?xt=urn:btih:{info_hash.hex()}&dn={display_name}&tr={tracker_url}/announce"
+        magnet_link = f"magnet:?xt=urn:btih:{info_hash}&dn={display_name}&tr={tracker_url}"
         if save_torrent_dir:
             with open(os.path.join(save_torrent_dir, f'{display_name}.txt'), 'w') as f:
                 f.write(magnet_link)

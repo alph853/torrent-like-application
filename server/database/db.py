@@ -73,7 +73,7 @@ class Database:
         self.peers[peer.id] = peer
         torrent = self.torrents[peer.info_hash]
         torrent.add_peer(peer)
-        print(f"Peer added to torrent {torrent.name}: {peer}")
+        print(f"Peer added to torrent {torrent.info_hash}: {peer}")
 
     def remove_peer(self, peer: Peer):
         """Remove a peer from the torrent and peer list."""

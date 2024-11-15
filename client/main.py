@@ -9,9 +9,6 @@ from widgets.add_file_dialog import *
 from src import TorrentClient
 import threading
 
-TOR_CLIENTS = []
-
-
 def get_ip_and_port():
     hostname = socket.gethostname()
     ip = socket.gethostbyname(hostname)
@@ -38,7 +35,6 @@ class MainWindow(QMainWindow):
             uploader_info = dialog.get_result()
             ip, port = get_ip_and_port()
             client = TorrentClient(ip=ip, port=port, uploader_info=uploader_info)
-            TOR_CLIENTS.append(client)
             threading.Thread(target=self.display_client_UI, daemon=True, args=(client, )).start()
 
     def add_torrent_file(self):
@@ -48,7 +44,6 @@ class MainWindow(QMainWindow):
             torrent_file_path, download_dir = dialog.get_result()
             ip, port = get_ip_and_port()
             client = TorrentClient(ip=ip, port=port, torrent_file=torrent_file_path, download_dir=download_dir)
-            TOR_CLIENTS.append(client)
             threading.Thread(target=self.display_client_UI, daemon=True, args=(client, )).start()
 
     def add_magnet_link(self):
@@ -58,19 +53,18 @@ class MainWindow(QMainWindow):
             magnet_link, download_dir = dialog.get_result()
             ip, port = get_ip_and_port()
             client = TorrentClient(ip=ip, port=port, magnet_link=magnet_link, download_dir=download_dir)
-            TOR_CLIENTS.append(client)
             threading.Thread(target=self.display_client_UI, daemon=True, args=(client, )).start()
 
     def display_client_UI(self, client: TorrentClient):
         """Display the client in the UI."""
-        # threading.Thread(target=self.display_console, daemon=True, args=(client, )).start()
-        # while True:
-        #     if not client.is_metadata_complete():
-        #         self.display_loading_screen()
-        #     else:
-        #         self.display_torrent_screen(client)
-        #         threading.Thread(target=self.display_download_progress, daemon=True, args=(client, )).start()
-        #         threading.Thread(target=self.display_peers, daemon=True, args=(client, )).start()
+        threading.Thread(target=self.display_console, daemon=True, args=(client, )).start()
+        while True:
+            if not client.is_metadata_complete():
+                self.display_loading_screen()
+            else:
+                self.display_torrent_screen(client)
+                threading.Thread(target=self.display_download_progress, daemon=True, args=(client, )).start()
+                threading.Thread(target=self.display_peers, daemon=True, args=(client, )).start()
 
     def display_console(self, client: TorrentClient):
         self.console.append(client.get_console_output())

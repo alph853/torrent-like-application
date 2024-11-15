@@ -6,14 +6,14 @@ from fastapi.responses import JSONResponse
 
 from database import Database, Torrent, Peer
 from utils import to_compact
-from test import db
+# from test import db
 
 app = FastAPI()
 
 TORRENT_DATABASE = Database()
-TORRENT_DATABASE = db
+# TORRENT_DATABASE = db
 
-INTERVAL = 60
+INTERVAL = 10
 
 
 @app.get("/")
@@ -29,8 +29,8 @@ async def announce(
     peer_id: str,
     uploaded: int,
     downloaded: int,
-    left: int,
     compact: int,
+    left: int | None = None,
     event: str | None = None,
 ):
     """Handle GET requests from peers announcing their status to the tracker."""
@@ -52,18 +52,20 @@ async def announce(
     if event == "started":
         TORRENT_DATABASE.add_peer(peer)
         print(f"peer {peer_id} has joined the swarm")
-    elif event == "completed" or event is None:
+    elif event == "completed":
         peer.left = 0
         TORRENT_DATABASE.update_peer(peer)
         print(f"peer {peer_id} has began seeding")
     elif event == "stopped":
         TORRENT_DATABASE.remove_peer(peer)
         print(f"Peer {peer_id} has left the swarm.")
+    elif event is None:
+        TORRENT_DATABASE.update_peer(peer)
+        print(f"Peer {peer_id} has updated their status.")
 
     # Return the list of peers to the requesting peer
     peer_list = TORRENT_DATABASE.get_torrent_peers(info_hash)
     peer_list = [p for p in peer_list if p.peer_id != peer_id]
-    print(peer_list)
 
     peers_response = to_compact(peer_list) if compact else peer_list
 

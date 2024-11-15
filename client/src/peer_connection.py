@@ -10,7 +10,7 @@ import bencodepy
 
 
 class PeerConnection:
-    def __init__(self, sock: socket.socket, target_peer: dict, piece_manager: PieceManager):
+    def __init__(self, info_hash, my_id, sock: socket.socket, target_peer: dict, piece_manager: PieceManager, outgoing):
         self.in_queue = Queue()
         self.out_queue = Queue()
 
@@ -23,16 +23,15 @@ class PeerConnection:
 
         self.extension_message_id = 0
         self.ut_metadata_id = 3
-
-        self.sock = sock
-        self.init_connection()
         self.peer_not_interest = True      # peer has downloaded everything, not interested in any more pieces
         self.send_to_console = ""
+        self.extension_supported = True
 
-    def init_connection(self):
-        """Establish connection to the peer and start send/receive threads."""
-        self.sock.connect((self.ip, self.port))
+        self.sock = sock
+        self.init_connection(info_hash, my_id, outgoing)
 
+    def init_connection(self, info_hash, my_id, outgoing):
+        self.send_handshake_message(info_hash, my_id, outgoing)
         self.in_thread = threading.Thread(target=self.process_recv_messages, daemon=True)
         self.in_thread.start()
 
@@ -66,6 +65,7 @@ class PeerConnection:
     def recv_message(self):
         length_prefix = self.sock.recv(4)
         if not length_prefix or len(length_prefix) < 4:
+            print(f"Received length prefix: {length_prefix.hex()}")
             raise ConnectionError("Incomplete message length prefix received.")
 
         message_length = int.from_bytes(length_prefix, byteorder="big")
@@ -189,7 +189,9 @@ class PeerConnection:
         """
         while self.queue_running:
             try:
+                print("Receiving message")
                 message = self.recv_message()
+                print(f"Received message: {message.hex()}")
                 match message[4]:
                     case MessageType.EXTENDED.value:
                         self.handle_extension_message(message)
@@ -212,13 +214,15 @@ class PeerConnection:
                     case _:
                         print(f"Unhandled message type: {message[4]}")
             except (ConnectionError, ValueError) as e:
-                print(f"Error receiving message: {e}, message: {message}")
+                print(f"Error receiving message: {e}")
+                self.queue_running = False
 
     def send_bitfield_message(self):
         """Send a bitfield message to the peer."""
         bitfield = self.piece_manager.get_bitfield()
         message = struct.pack(">IB", len(bitfield) + 1, MessageType.BITFIELD.value) + bitfield
         self.enqueue_send_message(message)
+        print(f"Sent bitfield message to peer {self.id}")
 
     def handle_bitfield_message(self, message):
         """Handle a bitfield message from the peer."""

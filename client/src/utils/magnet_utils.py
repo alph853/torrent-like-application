@@ -16,7 +16,7 @@ class MagnetUtilsClass:
         parsed_link = urlparse(magnet_link)
         params = parse_qs(parsed_link.query)
 
-        info_hash = params.get("xt", [None])[0]  # urn:btih: followed by the info hash
+        info_hash = params.get("xt", [None])[0].replace('urn:btih:', '')  # urn:btih: followed by the info hash
         display_name = params.get("dn", [None])[0]  # The display name
         tracker_url = params.get("tr", [None])[0]  # The tracker URL
         metadata = None

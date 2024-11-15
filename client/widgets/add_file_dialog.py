@@ -117,8 +117,16 @@ class AddFileDialogTorrent(QDialog):
             self.save_dir.setText(folder_path)
 
     def accept(self):
-        self.result = (self.selected_file, self.save_dir.text())
-        self.done(1)
+        if os.path.isdir(self.save_dir.text()):
+            self.result = (self.selected_file, self.save_dir.text())
+            self.done(1)
+        else:
+            warning_dialog = QMessageBox()
+            warning_dialog.setIcon(QMessageBox.Icon.Warning)
+            warning_dialog.setWindowTitle("Invalid Directory")
+            warning_dialog.setText("The selected directory path is not valid.")
+            warning_dialog.setStandardButtons(QMessageBox.StandardButton.Ok)
+            warning_dialog.exec()
 
     def get_result(self):
         return self.result
@@ -293,8 +301,6 @@ class CreateTorrentDialog(QDialog):
         self.done(1)
 
     def get_result(self):
-        magnet_text = b''
-        dialog = QDialog()
         return self.result
 
 

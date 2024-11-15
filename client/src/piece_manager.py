@@ -22,12 +22,17 @@ class PieceManager:
         self.metadata = metadata
 
         if metadata:
-            self.state = DownloadingFSM.PIECE_FIND
             self.metadata_pieces, self.metadata_size = self.split_metadata(metadata, piece_size)
             self.metadata_piece_count = self.metadata_size // piece_size + (1 if self.metadata_size % piece_size else 0)
             self.init_file_manager()
+            self.number_of_pieces = len(self.metadata['pieces'])//20
+            self.piece_counter = {i: 0 for i in range(self.number_of_pieces)}
             if pieces:
                 self.state = DownloadingFSM.SEEDING
+            else:
+                self.state = DownloadingFSM.PIECE_FIND
+            self.peer_bitfields = {peer['id']: [0] * self.number_of_pieces for peer in peer_list}
+
         else:
             self.state = DownloadingFSM.META_DOWN
             self.needed_metadata_pieces = None
@@ -36,8 +41,11 @@ class PieceManager:
             self.metadata_pieces = dict()
             self.metadata_size = None
             self.metadata_piece_count = None
+            self.number_of_pieces = None
+            self.piece_counter = dict()             # Counter of pieces that held by the client
+            self.peer_bitfields = {peer['id']: [] for peer in peer_list}
 
-        self.piece_counter = dict()             # Counter of pieces that held by the client
+
         self.pieces = pieces                    # Pieces the client holds
 
         self.requesting_blocks = dict()
@@ -45,8 +53,6 @@ class PieceManager:
         self.number_of_blocks = -1
         self.block_request_complete = None
 
-        self.number_of_pieces = None
-        self.peer_bitfields = {peer['id']: [] for peer in peer_list}
 
         self.top_uploaders = []
         self.peer_upload = {peer['id']: 0 for peer in peer_list}
@@ -55,9 +61,9 @@ class PieceManager:
         self.unchoked_peers = []
         self.interest_peers = []
 
-
     def is_done_downloading(self):
-        return self.state not in (DownloadingFSM.DOWN_DONE, DownloadingFSM.SEEDING)
+        # self.print_self_info()
+        return self.state in (DownloadingFSM.DOWN_DONE, DownloadingFSM.SEEDING)
 
     def is_seeding(self):
         return self.state == DownloadingFSM.SEEDING
@@ -124,10 +130,12 @@ class PieceManager:
     # -------------------------------------------------
     # -------------------------------------------------
 
-    def get_bitfield(self):
+    def get_bitfield(self) -> bytes:
         if self.pieces == {}:
             return ""
-        return ''.join([str(1) if i in self.pieces else str(0) for i in range(self.number_of_pieces)])
+        bitfield = b''.join([bytes(1) if i in self.pieces else bytes(0) for i in range(self.number_of_pieces)])
+        print(f"Bitfield: {bitfield}, number of pieces: {self.number_of_pieces}")
+        return bitfield
 
     def is_piece_request_done(self) -> int | None:
         if self.state == DownloadingFSM.PIECE_REQ_DONE or self.requesting_piece is not None:
@@ -161,7 +169,10 @@ class PieceManager:
 
         self.state = DownloadingFSM.PIECE_FIND
         data = {k: v for (k, v) in self.piece_counter.items() if v > 0}
-        idx =  min(data, key=data.get)
+        if not data:
+            return -1, []
+
+        idx = min(data, key=data.get)
         peers = [k for (k, v) in self.peer_bitfields.items() if v[idx]]
         return idx, peers
 
@@ -232,6 +243,7 @@ class PieceManager:
     def merge_all_pieces(self, dir):
         if sorted(self.pieces.keys()) != list(range(self.number_of_pieces)):
             print(f"Not all pieces are downloaded. List: {sorted(self.pieces.keys())}")
+            return None
 
         all_pieces = [self.pieces[i] for i in sorted(self.pieces.keys())]
         all_pieces = b''.join(all_pieces)
@@ -258,12 +270,6 @@ class PieceManager:
                 'downloaded': 100 if length == 0 else 0
             }
 
-        # def bytes_serializer(obj):
-        #     if isinstance(obj, bytes):
-        #         # Encode bytes to base64 and then decode to a UTF-8 string for JSON compatibility
-        #         return base64.b64encode(obj).decode('utf-8')
-        #     raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
-
         # print('File manager:', json.dumps(self.file_manager, indent=2, default=bytes_serializer))
         # print('Piece to file map:', json.dumps(self.piece2file_map, indent=2, default=bytes_serializer))
 
@@ -271,3 +277,18 @@ class PieceManager:
         progress = {file: self.file_manager[file]['downloaded'] for file in self.file_manager}
         progress = list(progress.items())
         return progress
+
+    def print_self_info(self):
+        print(json.dumps({
+            'state': self.state,
+            'piece_counter': self.piece_counter,
+            'number_of_pieces': self.number_of_pieces,
+            'peer_bitfields': self.peer_bitfields
+        }, indent=2, default=bytes_serializer))
+
+
+def bytes_serializer(obj):
+    if isinstance(obj, bytes):
+        # Encode bytes to base64 and then decode to a UTF-8 string for JSON compatibility
+        return base64.b64encode(obj).decode('utf-8')
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")

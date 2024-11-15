@@ -35,7 +35,6 @@ class TorrentClient:
 
         if magnet_link:
             params = MagnetUtils.parse_magnet_link(magnet_link)
-            self.info_hash, self.tracker_url, self.display_name, self.metadata = params
             self.init_downloader(params)
         elif torrent_file:
             params = TorrentUtils.parse_torrent_file(torrent_file)
@@ -44,7 +43,7 @@ class TorrentClient:
             params = TorrentUtils.parse_uploaded_torrent(uploader_info)
             self.init_uploader(params)
 
-        # threading.Thread(target=self.periodic_update_console, daemon=True).start()
+        threading.Thread(target=self.periodic_update_console, daemon=True).start()
 
         # ----------------- Server socket -----------------
 
@@ -83,25 +82,24 @@ class TorrentClient:
     def init_downloader(self, params):
         self.info_hash, self.tracker_url, self.display_name, self.metadata = params
         self.pieces = dict()
-        self.log(f"Downloading {self.display_name}...\n")
+        self.log(f"Downloading Torrent '{self.display_name}'...\n")
 
     def init_uploader(self, params):
         self.info_hash, self.tracker_url, self.display_name, self.metadata, pieces_dict = params
 
         self.downloading = False
-        self.status = 'completed'
         self.left = 0
         self.downloaded = sum([file['length'] for file in self.metadata['files']])
         self.uploaded = 0
 
         self.pieces = pieces_dict
-        self.log(f"Seeding {self.display_name}...\n")
+        self.log(f"Seeding Torrent '{self.display_name}'...\n")
 
     # -------------------------------------------------
     # ----------------- Server socket -----------------
     def listen_for_peers(self):
         """Listen for incoming peer connections and handle each new peer in a separate thread."""
-        self.log(f"Client is listening on {self.ip}:{self.port}")
+        self.log(f"Client is listening on {self.ip}, {self.port}")
         while True:
             sock, addr = self.server_socket.accept()
             threading.Thread(target=self.handle_peer_connection, args=(
@@ -117,8 +115,8 @@ class TorrentClient:
         }
         self.log(f"New connection from {addr}")
         try:
-            connection = PeerConnection(sock, target_peer, self.piece_manager)
-            connection.handshake_response(self.info_hash, self.peer_id, outgoing=False)
+            connection = PeerConnection(self.info_hash, self.peer_id, sock,
+                                        target_peer, self.piece_manager, outgoing=False)
             self.peer_connections[target_peer['id']] = connection
             self.piece_manager.add_peer(target_peer['id'])
             self.log(f"Sucessfully add connection to peer {target_peer['ip']}, {target_peer['port']}")
@@ -137,8 +135,9 @@ class TorrentClient:
         self.log(f"Connecting to peer {target_peer['ip']}, {target_peer['port']}")
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
-            connection = PeerConnection(sock, target_peer, self.piece_manager)
-            connection.send_handshake_message(self.info_hash, self.peer_id, outgoing=True)
+            sock.connect((target_peer['ip'], target_peer['port']))
+            connection = PeerConnection(self.info_hash, self.peer_id, sock,
+                                        target_peer, self.piece_manager, outgoing=True)
             self.peer_connections[target_peer['id']] = connection
             self.piece_manager.add_peer(target_peer['id'])
             self.log(f"Sucessfully connect to peer {target_peer['ip']}, {target_peer['port']}")
@@ -163,38 +162,16 @@ class TorrentClient:
         }
         response = requests.get(self.tracker_url, params=params).content
         response = bencodepy.decode(response)
-        print(f"Response from tracker: {response}")
+        # print(f"Response from tracker: {response}")
 
         peers = response[b'peers']
         self.interval = response[b'interval']
         self.peer_list = TorrentUtils.parse_compacted_peer_list(peers)
-        print(f"Interval: {self.interval} \nReceived peer list: {self.peer_list}")
+        # print(f"Interval: {self.interval} \nReceived peer list: {self.peer_list}")
 
     def send_tracker_request_periodic(self):
         # Send a request to the tracker, initialize peer_list and interval
-        time.sleep(self.interval)
-        while self.running:
-            params = {
-                'ip': self.ip,
-                'port': self.port,
-                'info_hash': self.info_hash,
-                'peer_id': self.peer_id,
-                'uploaded': self.uploaded,
-                'downloaded': self.downloaded,
-                'left': self.left,
-                'compact': 1,
-                'event': self.status
-            }
-            response = requests.get(self.tracker_url, params=params).content
-            response = bencodepy.decode(response)
-            print(f"Response from tracker: {response}")
-
-            # peers = response[b'peers']
-            # self.interval = response[b'interval']
-            # self.peer_list = TorrentUtils.parse_compacted_peer_list(peers)
-            # print(f"Interval: {self.interval} \nReceived peer list: {self.peer_list}")
-        # Wait for the interval before sending another request
-            time.sleep(self.interval)
+        pass
 
     # ------------------ UI handling ------------------
     # -------------------------------------------------
@@ -244,7 +221,10 @@ class TorrentClient:
 
             if not success_get_unchoked_peers:
                 piece_idx, peers = self.piece_manager.find_next_rarest_piece()
+                if piece_idx == -1:
+                    continue
                 if not piece_idx:       # If no piece is found, all pieces are downloaded
+                    self.log('All pieces has been downloaded!\n')
                     break
                 for id in peers:
                     self.peer_connections[id].send_interest_message(piece_idx)
@@ -276,4 +256,7 @@ class TorrentClient:
             connection.seeding()
 
     def periodic_update_console(self):
-        pass
+        # while True:
+        #     if string := self.get_console_output():
+        #         print(string)
+        return
