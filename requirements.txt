@@ -2,3 +2,4 @@ bencodepy
 fastapi[standard]
 pyqt6
 pyqt5designer
+requests

@@ -193,7 +193,7 @@ class CreateTorrentDialog(QDialog):
         fields_layout = QFormLayout()
 
         self.tracker_urls = QTextEdit()
-        self.tracker_urls.setText('http://localhost:8000/announce')
+        self.tracker_urls.setText('https://10diembtl.ngrok.app/announce')
         fields_layout.addRow("Tracker URLs:", self.tracker_urls)
 
         save_torrent_dir_layout = QHBoxLayout()
