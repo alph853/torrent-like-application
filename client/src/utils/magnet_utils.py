@@ -45,7 +45,6 @@ class MagnetUtilsClass:
         return payload
 
     def convert_to_normal_dict(self, metadata: OrderedDict):
-        # print('metadataaa:', metadata, type(metadata))
         pieces_bytes = metadata.get(b'pieces')
         metadata[b'pieces'] = ""
 

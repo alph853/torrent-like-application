@@ -144,7 +144,7 @@ class CreateTorrentDialog(QDialog):
         file_selection_layout = QVBoxLayout()
         self.file_path = QLineEdit()
         self.file_path.setPlaceholderText("Select Directory")
-        self.file_path.setText('D:/STUDY/Semester241/MMT/slide')
+        # self.file_path.setText('D:/STUDY/Semester241/MMT/slide')
         file_buttons_layout = QHBoxLayout()
         select_file_button = QPushButton("Select file")
         select_folder_button = QPushButton("Select folder")
@@ -201,7 +201,8 @@ class CreateTorrentDialog(QDialog):
         fields_layout = QFormLayout()
 
         self.tracker_urls = QTextEdit()
-        self.tracker_urls.setText('http://localhost:8000/announce')
+        # self.tracker_urls.setText('http://localhost:8000/announce')
+        self.tracker_urls.setText('https://10diembtl.ngrok.app/announce')
         fields_layout.addRow("Tracker URLs:", self.tracker_urls)
 
         save_torrent_dir_layout = QHBoxLayout()
@@ -209,7 +210,7 @@ class CreateTorrentDialog(QDialog):
 
         self.save_torrent_path = QLineEdit()
         self.save_torrent_path.setPlaceholderText("Select Directory")
-        self.save_torrent_path.setText('D:/STUDY/Semester241/MMT')
+        # self.save_torrent_path.setText('D:/STUDY/Semester241/MMT')
 
         file_buttons_layout = QHBoxLayout()
         select_folder_torrent_button = QPushButton("Browse")
@@ -282,7 +283,6 @@ class CreateTorrentDialog(QDialog):
         try:
             tracker_response = requests.get(tracker_url.replace("announce", "")).content
             if tracker_response != b'"xyz"':
-                print(tracker_response)
                 raise requests.exceptions.RequestException
         except requests.exceptions.RequestException:
             QMessageBox.critical(self, "Error", "The tracker URL is invalid.")

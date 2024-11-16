@@ -10,7 +10,7 @@ from .peer_connection import PeerConnection
 
 
 class TorrentClient:
-    def __init__(self, ip, port, torrent_file=None, magnet_link=None, download_dir=None, uploader_info: dict = None):
+    def __init__(self, ip, port, torrent_file=None, magnet_link=None, download_dir=None, uploader_info: dict = None, cli=False):
         """
         Example:
             uploader_info = {
@@ -43,7 +43,8 @@ class TorrentClient:
             params = TorrentUtils.parse_uploaded_torrent(uploader_info)
             self.init_uploader(params)
 
-        threading.Thread(target=self.periodic_update_console, daemon=True).start()
+        if cli:
+            threading.Thread(target=self.periodic_update_console, daemon=True).start()
 
         # ----------------- Server socket -----------------
 
@@ -87,7 +88,7 @@ class TorrentClient:
     def init_downloader(self, params):
         self.info_hash, self.tracker_url, self.display_name, self.metadata = params
         self.pieces = dict()
-        self.log(f"Downloading Torrent '{self.display_name}'...\n")
+        self.log(f"Downloading Torrent '{self.display_name}'  ...\n")
 
     def init_uploader(self, params):
         self.info_hash, self.tracker_url, self.display_name, self.metadata, pieces_dict = params
@@ -98,7 +99,7 @@ class TorrentClient:
         self.uploaded = 0
 
         self.pieces = pieces_dict
-        self.log(f"Seeding Torrent '{self.display_name}'...\n")
+        self.log(f"Seeding Torrent '{self.display_name}'  ...\n")
 
     # -------------------------------------------------
     # ----------------- Server socket -----------------
@@ -124,7 +125,7 @@ class TorrentClient:
                                         target_peer, self.piece_manager, outgoing=False, client_log_function=self.log)
             self.peer_connections[target_peer['id']] = connection
             self.piece_manager.add_peer(target_peer['id'])
-            self.log(f"Sucessfully add connection to peer {target_peer['ip']}, {target_peer['port']}")
+            self.log(f"Successfully add connection to peer {target_peer['ip']}, {target_peer['port']}\n")
         except Exception as e:
             self.log(f"Error handling connection from {addr}: {e}")
 
@@ -144,7 +145,7 @@ class TorrentClient:
             connection = PeerConnection(self.info_hash, self.peer_id, sock,
                                         target_peer, self.piece_manager, outgoing=True, client_log_function=self.log)
             self.peer_connections[target_peer['id']] = connection
-            self.log(f"Sucessfully connect to peer {target_peer['ip']}, {target_peer['port']}")
+            self.log(f"Successfully connect to peer {target_peer['ip']}, {target_peer['port']}\n")
             self.connected_to_peers = True
         except Exception as e:
             self.log(f"Failed to connect to peer {target_peer['ip']}, {target_peer['port']}: {e}")
@@ -167,12 +168,10 @@ class TorrentClient:
         }
         response = requests.get(self.tracker_url, params=params).content
         response = bencodepy.decode(response)
-        # print(f"Response from tracker: {response}")
 
         peers = response[b'peers']
         self.interval = response[b'interval']
         self.peer_list = TorrentUtils.parse_compacted_peer_list(peers)
-        # print(f"Interval: {self.interval} \nReceived peer list: {self.peer_list}")
 
     def send_tracker_request_periodic(self):
         # Send a request to the tracker, initialize peer_list and interval
@@ -221,7 +220,7 @@ class TorrentClient:
 
             piece = self.piece_manager.is_piece_request_done()
             if piece is not None:
-                self.log(f"Piece {piece} downloaded!")
+                self.log(f"\nPiece {piece} downloaded!\n")
                 for connection in self.peer_connections.values():
                     connection.send_have_message(piece)
                 success_get_unchoked_peers = False
@@ -230,7 +229,7 @@ class TorrentClient:
             if not success_get_unchoked_peers:
                 piece_idx, peers = self.piece_manager.find_next_rarest_piece()
                 if piece_idx is None:       # If no piece is found, all pieces are downloaded
-                    self.log('All pieces has been downloaded!\n')
+                    self.log(f'\nn{'-'*40}\nAll pieces has been downloaded!\n{"-"*40}\n')
                     break
                 for id in peers:
                     self.peer_connections[id].send_interest_message()
@@ -239,7 +238,7 @@ class TorrentClient:
 
                 unchoked_peers = self.piece_manager.get_unchoked_peers()
                 if not unchoked_peers:
-                    print("Trying to get unchoked peers")
+                    self.log("Trying to get unchoked peers...\n")
                     continue
                 success_get_unchoked_peers = True
 
@@ -247,16 +246,16 @@ class TorrentClient:
                 block_requests = TorrentUtils.divide_piece_into_blocks(
                     piece_idx, self.piece_manager.piece_size, self.piece_manager.block_size)
                 self.piece_manager.add_requesting_blocks(piece_idx, block_requests)
-                self.log(f"Requesting piece {piece_idx}\n")
+                self.log(f"\nREQUESTING PIECE {piece_idx} ...\n\n")
                 # Distribute blocks among unchoked peers
                 for i, args in enumerate(block_requests):
                     peer = unchoked_peers[i % len(unchoked_peers)]
                     self.peer_connections[peer].send_request_message(*args)
                     ip = self.peer_connections[peer].ip
                     port = self.peer_connections[peer].port
-                    self.log(f"Requesting block {args} to peer {ip}, {port}\n")
+                    self.log(f"Requesting block {args} to peer {ip}, {port} ...\n")
 
-        self.log("Download complete!!\n" * 3)
+        self.log(f"\n{'-'*40}\n{'\t\tDownload complete!!\n'*3}\n{'-'*40}\n{'-'*40}")
         self.downloading = False
         self.piece_manager.merge_all_pieces(self.download_dir)
         threading.Thread(target=self.start_uploading_only, daemon=True).start()
@@ -268,6 +267,5 @@ class TorrentClient:
 
     def periodic_update_console(self):
         while True:
-            if string := self.get_console_output():
-                print(string)
+            print(self.get_console_output(), end="")
         return

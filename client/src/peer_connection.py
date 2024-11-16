@@ -252,19 +252,29 @@ class PeerConnection:
                 print(f"Error receiving message: {e}")
                 self.queue_running = False
 
+
     def send_bitfield_message(self):
         """Send a bitfield message to the peer."""
         bitfield = self.piece_manager.get_bitfield()
-        message = struct.pack(">IB", len(bitfield) + 1 + 4, MessageType.BITFIELD.value) + bitfield
+        if bitfield == b'':
+            return
+        message_length = len(bitfield) + 1 + 4
+        message = struct.pack(">IB", message_length, MessageType.BITFIELD.value) + bitfield
         self.enqueue_send_message(message)
+
 
     def handle_bitfield_message(self, message):
         """Handle a bitfield message from the peer."""
         bitfield = message[5:]
-        bitfield = [int(b) for b in bitfield]
-        self.client_log_function(f"Receive bitfield message from peer {self.ip}, {
-                                 self.port}: {''.join([str(b) for b in bitfield])}\n")
-        self.piece_manager.add_peer_bitfield(self.id, bitfield)
+        parsed_bitfield = []
+
+        for byte in bitfield:
+            for bit_position in range(8):
+                parsed_bitfield.append((byte >> (7 - bit_position)) & 1)
+        parsed_bitfield = parsed_bitfield[:self.piece_manager.number_of_pieces]
+        self.client_log_function(f"Receive bitfield from peer {self.ip}, {
+                                 self.port}: {parsed_bitfield}\n")
+        self.piece_manager.add_peer_bitfield(self.id, parsed_bitfield)
 
     def send_choke_message(self):
         """Send a choke message to the peer."""
@@ -273,7 +283,7 @@ class PeerConnection:
 
     def handle_choke_message(self):
         """Handle a choke message from the peer."""
-        self.client_log_function(f"Peer {self.id} choked.")
+        self.client_log_function(f"Peer {self.ip}, {self.port} choked.\n")
 
     def send_unchoke_message(self):
         """Send an unchoke message to the peer."""
@@ -283,7 +293,8 @@ class PeerConnection:
     def handle_unchoke_message(self):
         """Handle an unchoke message from the peer."""
         self.piece_manager.add_unchoked_peer(self.id)
-        self.client_log_function(f"Peer {self.ip}, {self.port} unchoked.")
+        self.client_log_function(f"Peer {self.ip}, {self.port} unchoked.\n")
+
 
     def send_request_message(self, piece_index, begin, length):
         """Send a request message to the peer."""
@@ -310,7 +321,7 @@ class PeerConnection:
         """Handle a have message from the peer."""
         piece_index = struct.unpack(">I", message[5:])[0]
         self.piece_manager.add_peer_piece(self.id, piece_index)
-        self.client_log_function(f"Peer {self.ip}, {self.port} has piece {piece_index}")
+        self.client_log_function(f"\nPeer {self.ip}, {self.port} has piece {piece_index}\n")
 
     def send_piece_message(self, piece_index, begin, block):
         """Send a piece message to the peer."""
@@ -344,6 +355,7 @@ class PeerConnection:
     def handle_not_interested_message(self):
         """Handle a not interested message from the peer."""
         self.peer_not_interest = True
+        self.piece_manager.add_not_interest_peers(self.id)
 
     def enqueue_send_message(self, message):
         """Enqueue a message to be sent to the peer."""
