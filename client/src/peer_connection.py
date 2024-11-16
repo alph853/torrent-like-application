@@ -88,7 +88,6 @@ class PeerConnection:
         try:
             payload = message[6:]
             decoded_payload = bencodepy.decode(payload)
-            print(f"Received extension message: {decoded_payload}")
 
             if decoded_payload.get(b"msg_type") is not None:
                 msg_type = decoded_payload.get(b"msg_type")
@@ -114,9 +113,9 @@ class PeerConnection:
             handshake_message = {b"m": {b"ut_metadata": self.ut_metadata_id}}
             payload = MagnetUtils.construct_extension_payload(handshake_message, self.extension_message_id)
             self.sock.send(payload)
-            print("Sent extension handshake.")
+            self.client_log_function(f"Sent extension handshake to {self.ip}, {self.port}.")
         except Exception as e:
-            print(f"Error sending extension handshake: {e}")
+            self.client_log_function(f"Error sending extension handshake: {e}")
 
 
     def handle_extension_handshake_request(self):
@@ -128,9 +127,9 @@ class PeerConnection:
                 response[b"metadata_size"] = metadata_size
             payload = MagnetUtils.construct_extension_payload(response, self.extension_message_id)
             self.sock.send(payload)
-            print("Sent extension handshake response.")
+            self.client_log_function(f"Sent extension handshake response {self.ip}, {self.port}.")
         except Exception as e:
-            print(f"Error handling extension handshake request: {e}")
+            self.client_log_function(f"Error handling extension handshake request: {e}")
 
 
     def handle_extension_handshake_response(self, decoded_payload):
@@ -145,7 +144,7 @@ class PeerConnection:
                 self.ut_metadata_id = ut_metadata_id
                 self.send_metadata_request()
         except Exception as e:
-            print(f"Error handling extension handshake response: {e}")
+            self.client_log_function(f"Error handling extension handshake response: {e}")
 
 
     def send_metadata_request(self):
@@ -156,11 +155,11 @@ class PeerConnection:
                 request_dict = {b"msg_type": ExtensionMessageType.REQUEST.value, b"piece": piece_idx}
                 payload = MagnetUtils.construct_extension_payload(request_dict, self.extension_message_id)
                 self.sock.send(payload)
-                print(f"Requested metadata piece {piece_idx}.")
+                self.client_log_function(f"Requested metadata piece {piece_idx}.")
             else:
-                print("All metadata pieces downloaded.")
+                self.client_log_function("All metadata pieces downloaded.")
         except Exception as e:
-            print(f"Error sending metadata request: {e}")
+            self.client_log_function(f"Error sending metadata request: {e}")
 
 
     def handle_metadata_response(self, message):
@@ -170,20 +169,23 @@ class PeerConnection:
             bencoded_end_index = bencoded_dict.find(b"ee") + 2
             decoded_message = bencodepy.decode(bencoded_dict[:bencoded_end_index])
 
-            msg_type = decoded_message.get(b"msg_type")
-            piece_index = decoded_message.get(b"piece")
+            raw_decoded_message = bencodepy.decode(bencoded_dict[:bencoded_end_index])
+            decoded_message = {key.decode("utf-8"): value for key, value in raw_decoded_message.items()}
+
+            msg_type = decoded_message.get("msg_type")
+            piece_index = decoded_message.get("piece")
 
             if msg_type == ExtensionMessageType.DATA.value:
                 metadata_piece = bencoded_dict[bencoded_end_index:]
                 self.piece_manager.set_metadata_piece(piece_index, metadata_piece)
-                print(f"Metadata piece {piece_index} downloaded.")
+                self.client_log_function(f"Metadata piece {piece_index} downloaded.")
                 self.send_metadata_request()
             elif msg_type == ExtensionMessageType.REJECT.value:
-                print(f"Metadata piece {piece_index} rejected by peer.")
+                self.client_log_function(f"Metadata piece {piece_index} rejected by peer.")
             else:
-                print("Invalid metadata message type received.")
+                self.client_log_function("Invalid metadata message type received.")
         except Exception as e:
-            print(f"Error handling metadata response: {e}")
+            self.client_log_function(f"Error handling metadata response: {e}")
 
 
     def handle_metadata_request(self, message):
@@ -195,16 +197,17 @@ class PeerConnection:
 
             if metadata_piece is not None:
                 response = {b"msg_type": ExtensionMessageType.DATA.value, b"piece": piece_index}
-                payload = MagnetUtils.construct_extension_payload(response, self.extension_message_id) + metadata_piece
+                payload = MagnetUtils.construct_extension_payload(
+                    response, self.extension_message_id, added_length=len(metadata_piece)) + metadata_piece
                 self.sock.send(payload)
-                print(f"Sent metadata piece {piece_index} to peer.")
+                self.client_log_function(f"Sent metadata piece {piece_index} to peer.")
             else:
                 response = {b"msg_type": ExtensionMessageType.REJECT.value, b"piece": piece_index}
                 payload = MagnetUtils.construct_extension_payload(response, self.extension_message_id)
                 self.sock.send(payload)
-                print(f"Rejected metadata piece {piece_index} request from peer.")
+                self.client_log_function(f"Rejected metadata piece {piece_index} request from peer.")
         except Exception as e:
-            print(f"Error handling metadata request: {e}")
+            self.client_log_function(f"Error handling metadata request: {e}")
 
 
     def process_send_messages(self):
@@ -280,7 +283,7 @@ class PeerConnection:
     def handle_unchoke_message(self):
         """Handle an unchoke message from the peer."""
         self.piece_manager.add_unchoked_peer(self.id)
-        self.client_log_function(f"Peer {self.id} unchoked.")
+        self.client_log_function(f"Peer {self.ip}, {self.port} unchoked.")
 
     def send_request_message(self, piece_index, begin, length):
         """Send a request message to the peer."""
@@ -296,7 +299,7 @@ class PeerConnection:
             block = self.piece_manager.get_block(index, begin, length)
             self.send_piece_message(index, begin, block)
         self.client_log_function(f"Receive request message from peer {self.ip}, {
-                                 self.port}: {index}, {begin}, {length}\n")
+                                 self.port}: {index}, {begin}, {length}")
 
     def send_have_message(self, piece_index):
         """Send a have message to the peer."""
@@ -307,7 +310,7 @@ class PeerConnection:
         """Handle a have message from the peer."""
         piece_index = struct.unpack(">I", message[5:])[0]
         self.piece_manager.add_peer_piece(self.id, piece_index)
-        self.client_log_function(f"Peer {self.ip}, {self.port} has piece {piece_index}\n")
+        self.client_log_function(f"Peer {self.ip}, {self.port} has piece {piece_index}")
 
     def send_piece_message(self, piece_index, begin, block):
         """Send a piece message to the peer."""
@@ -318,8 +321,8 @@ class PeerConnection:
         """Handle a piece message from the peer."""
         _, begin = struct.unpack(">II", message[5:13])
         block = message[13:]
-        self.piece_manager.add_block(begin, block)
-        self.client_log_function(f"Receive a block from peer ({self.ip}, {self.port})\n")
+        self.piece_manager.add_block(self.id, begin, block)
+        self.client_log_function(f"Receive a block from peer ({self.ip}, {self.port})")
 
     def send_interest_message(self):
         """Send an interested to the peer for a specific piece."""

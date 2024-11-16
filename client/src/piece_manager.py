@@ -7,7 +7,7 @@ import threading
 import time
 import bencodepy
 
-from .utils import TorrentUtils
+from .utils import TorrentUtils, MagnetUtils
 
 lock = threading.Lock()
 
@@ -16,12 +16,15 @@ class DownloadingFSM(enumerate):
     META_DOWN, PIECE_FIND, PIECE_REQ, PIECE_REQ_DONE, DOWN_DONE, SEEDING = range(6)
 
 class PieceManager:
-    def __init__(self, peer_list, metadata: dict, pieces: dict, piece_size=512*1024, block_size=64*1024):
+    def __init__(self, peer_list, metadata: dict, pieces: dict, client, piece_size=512*1024, block_size=64*1024):
         self.piece_size = piece_size
         self.block_size = block_size
         self.metadata = metadata
+        self.peer_upload = {peer['id']: 0 for peer in peer_list}
+        self.client = client
 
         if metadata:
+            print('Metadata: ', metadata)
             self.metadata_pieces, self.metadata_size = self.split_metadata(metadata, piece_size)
             self.metadata_piece_count = self.metadata_size // piece_size + (1 if self.metadata_size % piece_size else 0)
             self.number_of_pieces = len(self.metadata['pieces'])//20
@@ -32,7 +35,7 @@ class PieceManager:
                 self.state = DownloadingFSM.PIECE_FIND
             self.peer_bitfields = {peer['id']: [0] * self.number_of_pieces for peer in peer_list}
             self.init_file_manager()
-
+            threading.Thread(target=self.calculating_top_uploaders, daemon=True).start()
         else:
             self.state = DownloadingFSM.META_DOWN
             self.needed_metadata_pieces = None
@@ -52,9 +55,7 @@ class PieceManager:
         self.number_of_blocks = -1
         self.block_request_complete = None
 
-
         self.top_uploaders = []
-        self.peer_upload = {peer['id']: 0 for peer in peer_list}
 
         self.optimistic_unchoked_peer = None
         self.unchoked_peers = []
@@ -106,6 +107,7 @@ class PieceManager:
         piece = next((i for i, x in enumerate(self.needed_metadata_pieces) if x), None)
 
         if piece is None:
+            print("Call thisssssssss")
             self.state = DownloadingFSM.PIECE_FIND
             self.metadata_merge()
             threading.Thread(target=self.calculating_top_uploaders, daemon=True).start()
@@ -119,7 +121,7 @@ class PieceManager:
         pieces = [self.metadata_pieces[idx] for idx in sorted(self.metadata_pieces.keys())]
         metadata = b''.join(pieces)
         self.metadata = bencodepy.decode(metadata)
-        print('Metadata:', json.dumps(self.metadata, indent=2, default=bytes_serializer))
+        self.metadata = MagnetUtils.convert_to_normal_dict(self.metadata)
         self.init_file_manager()
 
     # -------------------------------------------------
@@ -172,13 +174,13 @@ class PieceManager:
 
     def add_peer_piece(self, id, piece_index):
         self.peer_bitfields[id][piece_index] = 1
-        self.piece_counter[piece_index] += 1
 
-    def is_download_complete(self):
-        return self.download_complete
+        if self.piece_counter.get(piece_index) is not None:
+            self.piece_counter[piece_index] += 1
 
     def select_peers_for_unchoking(self) -> list:
-        return self.top_uploaders + [self.optimistic_unchoked_peer]
+        list_peers = self.top_uploaders + [self.optimistic_unchoked_peer]
+        return list_peers
 
     def get_unchoked_peers(self):
         return self.unchoked_peers
@@ -187,10 +189,12 @@ class PieceManager:
         self.unchoked_peers.append(id)
 
     def calculating_top_uploaders(self):
-        while not self.download_complete:
+        while True:
             top_uploaders = Counter(self.peer_upload).most_common(4)
             self.top_uploaders = [id for id, _ in top_uploaders]
-            time.sleep(5)
+
+            print('Top uploaders:', self.client.get_peers(self.top_uploaders))
+            time.sleep(10)
 
     # -------------------------------------------------
     # -------------------------------------------------
@@ -204,8 +208,9 @@ class PieceManager:
         self.number_of_blocks = len(block_requests)
         self.state = DownloadingFSM.PIECE_REQ
 
-    def add_block(self, start, block_data):
+    def add_block(self, id, start, block_data):
         self.requesting_blocks[start] = block_data
+        self.set_peer_upload(id, len(block_data))
 
         if len(self.requesting_blocks.keys()) == self.number_of_blocks:
             self.state = DownloadingFSM.PIECE_REQ_DONE

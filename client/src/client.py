@@ -63,8 +63,9 @@ class TorrentClient:
 
         # -------------------------------------------------
         # ---------------- Start Torrenting ---------------
-        self.piece_manager = PieceManager(peer_list=self.peer_list, metadata=self.metadata, pieces=self.pieces)
         self.peer_connections: dict[str, PeerConnection] = dict()
+        self.piece_manager = PieceManager(peer_list=self.peer_list,
+                                          metadata=self.metadata, pieces=self.pieces, client=self)
 
         self.connected_to_peers = False
         self.init_connections()
@@ -195,7 +196,9 @@ class TorrentClient:
         """Get the progress of the download in percentage."""
         return self.piece_manager.get_progress()
 
-    def get_peers(self) -> list[tuple[str, int]]:
+    def get_peers(self, id_list=None) -> list[tuple[str, int]]:
+        if id_list:
+            return [(c.ip, c.port) for c in self.peer_connections.values() if c.id in id_list]
         return [(c.ip, c.port) for c in self.peer_connections.values()]
 
     # -------------------------------------------------

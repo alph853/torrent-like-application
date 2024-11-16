@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import struct
 from urllib.parse import urlparse, parse_qs
 
@@ -32,16 +33,40 @@ class MagnetUtilsClass:
         return bytes(reserved_bytes)
 
     @staticmethod
-    def construct_extension_payload(message, extension_message_id) -> bytes:
+    def construct_extension_payload(message, extension_message_id, added_length=0) -> bytes:
         """Construct a payload for an extension message."""
         bencoded_message = bencodepy.encode(message)
-        message_length = len(bencoded_message) + 6
+        message_length = len(bencoded_message) + 6 + added_length
         payload = (
             struct.pack(">Ib", message_length, MessageType.EXTENDED.value)
             + struct.pack("B", extension_message_id)
             + bencoded_message
         )
         return payload
+
+    def convert_to_normal_dict(self, metadata: OrderedDict):
+        # print('metadataaa:', metadata, type(metadata))
+        pieces_bytes = metadata.get(b'pieces')
+        metadata[b'pieces'] = ""
+
+        data = self.convert_to_normal_dict_rec(metadata)
+        data['pieces'] = pieces_bytes
+        return data
+
+    def convert_to_normal_dict_rec(self, metadata: OrderedDict):
+        """
+        Recursively converts an OrderedDict (or dictionary) with byte keys and values 
+        to a standard Python dictionary with string keys and values.
+        """
+        if isinstance(metadata, dict):
+            return {k.decode("utf-8") if isinstance(k, bytes) else k:
+                    self.convert_to_normal_dict_rec(v) for k, v in metadata.items()}
+        elif isinstance(metadata, list):
+            return [self.convert_to_normal_dict_rec(item) for item in metadata]
+        elif isinstance(metadata, bytes):
+            return metadata.decode("utf-8")
+        else:
+            return metadata
 
 
 MagnetUtils = MagnetUtilsClass()
