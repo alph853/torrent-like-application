@@ -200,6 +200,7 @@ class TorrentUtilsClass:
                 # Get current file info
                 current_file = files[current_file_index]
                 file_name = current_file["path"]
+                
                 file_length = current_file["length"]
 
                 # Calculate how much data can fit in the current file
@@ -207,7 +208,9 @@ class TorrentUtilsClass:
 
                 if piece_remaining <= available_in_file:
                     # The piece fits within the remaining part of the current file
+                    print(f"file_name: {file_name}")
                     piece_to_file_map[current_piece].append({
+                        
                         "file": os.path.join(*file_name),
                         "length_in_file": piece_remaining,
                         # "is_last": piece_remaining == available_in_file

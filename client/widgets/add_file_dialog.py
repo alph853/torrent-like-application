@@ -1,5 +1,6 @@
 import os
 from PyQt6.QtWidgets import *
+from PyQt6.QtCore import Qt, QTimer
 import requests
 
 class AddFileDialogMagnet(QDialog):
@@ -145,6 +146,7 @@ class CreateTorrentDialog(QDialog):
         self.file_path = QLineEdit()
         self.file_path.setPlaceholderText("Select Directory")
         self.file_path.setText('D:/STUDY/Semester241/MMT/slide')
+        self.file_path.setStyleSheet("color: white;")
         file_buttons_layout = QHBoxLayout()
         select_file_button = QPushButton("Select file")
         select_folder_button = QPushButton("Select folder")
@@ -174,11 +176,54 @@ class CreateTorrentDialog(QDialog):
         start_seeding_checkbox = QCheckBox("Start seeding immediately")
         ignore_ratio_checkbox = QCheckBox("Ignore share ratio limits for this torrent")
         optimize_alignment_checkbox = QCheckBox("Optimize alignment")
+        
 
         piece_boundary_label = QLabel("Align to piece boundary for files larger than:")
         piece_boundary_combo = QComboBox()
         piece_boundary_combo.addItems(["512 KiB", "1 MiB", "2 MiB"])
+        piece_boundary_combo.setStyleSheet("""
+            QComboBox {
+                color: white;
+                background-color: black;
+                border: 1px solid gray;
+            }
+            QComboBox QAbstractItemView {
+                color: white;
+                background-color: black;
+            }
+        """)
+        piece_size_combo.setStyleSheet("""
+            QComboBox {
+                color: white;
+                background-color: black;
+                border: 1px solid gray;
+            }
+            QComboBox QAbstractItemView {
+                color: white;
+                background-color: black;
+            }
+        """)
+        button_style = """
+QPushButton {
+    border: 1px solid white;
+    border-radius: 5px;
+    color: white;
+    background-color: transparent;
+    font-size:12px;
+    padding-top: -3px;
+    padding-bottom: -3px;
+}
+QPushButton:hover {
+    border: 1px solid #ffd740;  
+    background-color: #202020;  
+}
+QPushButton:pressed {
+    border: 1px solid #ffb300;  
+    background-color: #303030;  
+}
 
+"""
+        self.setStyleSheet(button_style)
         # Adding widgets to settings layout
         settings_layout.addWidget(piece_size_label, 0, 0)
         settings_layout.addWidget(piece_size_combo, 0, 1)
@@ -201,7 +246,7 @@ class CreateTorrentDialog(QDialog):
         fields_layout = QFormLayout()
 
         self.tracker_urls = QTextEdit()
-        self.tracker_urls.setText('https://10diembtl.ngrok.app/announce')
+        self.tracker_urls.setText('http://localhost:8001/announce')
         fields_layout.addRow("Tracker URLs:", self.tracker_urls)
 
         save_torrent_dir_layout = QHBoxLayout()
@@ -210,6 +255,7 @@ class CreateTorrentDialog(QDialog):
         self.save_torrent_path = QLineEdit()
         self.save_torrent_path.setPlaceholderText("Select Directory")
         self.save_torrent_path.setText('D:/STUDY/Semester241/MMT')
+        self.save_torrent_path.setStyleSheet("color: white;")
 
         file_buttons_layout = QHBoxLayout()
         select_folder_torrent_button = QPushButton("Browse")
@@ -231,6 +277,8 @@ class CreateTorrentDialog(QDialog):
         button_layout.addWidget(create_button)
         button_layout.addWidget(cancel_button)
         main_layout.addLayout(button_layout)
+        
+
 
         # Set the main layout
         self.setLayout(main_layout)
@@ -330,3 +378,28 @@ class ConfigFormTorrent(QDialog):
     def get_selected_files(self):
         selected_items = self.file_list_widget.selectedItems()
         return [item.text() for item in selected_items]
+    
+class LoadingScreen(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Loading...")
+        self.setModal(True)  # Blocks interaction with other windows while active
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        
+        # Layout and widgets
+        layout = QVBoxLayout()
+        self.label = QLabel("Loading, please wait...")
+        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label)
+
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 0)  # Infinite progress bar
+        layout.addWidget(self.progress)
+
+        self.setLayout(layout)
+        self.setFixedSize(300, 150)
+
+    def set_message(self, message):
+        """Update the loading message."""
+        self.label.setText(message)
