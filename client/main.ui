@@ -6,10 +6,19 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1360</width>
-    <height>961</height>
+    <width>900</width>
+    <height>900</height>
    </rect>
   </property>
+  <property name="styleSheet">
+    <string notr="true">
+        * {
+            font-family: 'Verdana';
+            font-size: 12px;
+        }
+        
+    </string>
+</property>
   <property name="windowTitle">
    <string>MainWindow</string>
   </property>
@@ -19,10 +28,11 @@
    </property>
    <property name="minimumSize">
     <size>
-     <width>1149</width>
-     <height>916</height>
+     <width>1000</width>
+     <height>800</height>
     </size>
    </property>
+
    <layout class="QVBoxLayout" name="verticalLayout_5">
     <property name="leftMargin">
      <number>30</number>
@@ -30,6 +40,7 @@
     <property name="rightMargin">
      <number>30</number>
     </property>
+    
     <item>
      <spacer name="horizontalSpacer_2">
       <property name="orientation">
@@ -45,22 +56,29 @@
     </item>
     <item>
      <widget class="QLineEdit" name="lineEdit">
-      <property name="styleSheet">
-       <string notr="true">font: 12pt &quot;Century&quot;;</string>
-      </property>
       <property name="text">
        <string/>
       </property>
       <property name="placeholderText">
        <string>Filter Torrents ...</string>
       </property>
+      <property name="styleSheet">
+        <string>
+            QLineEdit {
+                color: #ecf0f1;  /* Text color */
+            }
+        </string>
+    </property>
      </widget>
     </item>
     <item>
-     <widget class="QTableWidget" name="tableWidget">
-      <property name="styleSheet">
-       <string notr="true">font: 12pt &quot;Century&quot;;</string>
-      </property>
+     <widget class="QTableView" name="tableView">
+        <property name="sizePolicy">
+    <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+     <horstretch>1</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
+   </property>
       <column>
        <property name="text">
         <string>Name</string>
@@ -108,11 +126,44 @@
     </item>
     <item>
      <widget class="QTabWidget" name="tabWidget">
-      <property name="styleSheet">
-       <string notr="true">font: 12pt &quot;Century&quot;;</string>
-      </property>
+      <property name="sizePolicy">
+    <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+     <horstretch>2</horstretch>
+     <verstretch>1</verstretch>
+    </sizepolicy>
+   </property>
+   
+   <property name="styleSheet">
+  <string>
+ QTabWidget::pane { 
+    border: 1px solid #555;  
+    background: transparent;
+    height:350px;
+    padding:10px;
+} 
+QTabBar::tab { 
+    background: #3e3e3e;  
+    color:  #ffd740; 
+    border: 1px solid #555; 
+    border: none;
+    border-radius: 4px; 
+} 
+QTabBar::tab:selected { 
+    background:  #ffd740; 
+    color: #2b2b2b; 
+    font-weight: bold;
+} 
+QTabBar::tab:hover { 
+    background: #ffeb6b; 
+    color: #2b2b2b; 
+} 
+QTabBar::tab:!selected { 
+    margin-top: 2px; 
+}
+  </string>
+ </property>
       <property name="currentIndex">
-       <number>2</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="tab_5">
        <attribute name="title">
@@ -120,20 +171,33 @@
        </attribute>
       </widget>
       <widget class="QWidget" name="tab_6">
+      
        <attribute name="title">
         <string>Peers</string>
        </attribute>
+       <widget class="QLabel" name="label_peers">
+    <property name="text">
+        <string>Loading peers...</string>
+    </property>
+</widget>
       </widget>
       <widget class="QWidget" name="tab_7">
-       <property name="enabled">
-        <bool>true</bool>
-       </property>
        <attribute name="title">
         <string>Content</string>
        </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_tab7">
+  <item>
+   <widget class="QTableView" name="tableWidgetContent">
+    
+    
+   </widget>
+  </item>
+ </layout>
       </widget>
+      
      </widget>
     </item>
+    
    </layout>
   </widget>
   <widget class="QMenuBar" name="menubar">
@@ -180,12 +244,26 @@
     </size>
    </property>
    <property name="styleSheet">
-    <string notr="true">font: 14pt &quot;Century&quot;;
+    <string notr="true">
 
 QPushButton {
     background-color: transparent;
-    padding-right: 10px;  /* Adjust the padding as needed */
-}</string>
+    padding-right: 10px;  
+    color:#ecf0f1;
+}
+QDockWidget::close-button,
+        QDockWidget::float-button,
+        QDockWidget::toggle-view-button {
+            background-color:#95a5a6;  
+            border-radius: 2px;               
+        }
+        QDockWidget::close-button:hover,
+        QDockWidget::float-button:hover,
+        QDockWidget::toggle-view-button:hover {
+            background-color: #ffd740;       
+            color: #34495e;                 
+        }
+        </string>
    </property>
    <attribute name="dockWidgetArea">
     <number>1</number>
@@ -200,14 +278,23 @@ QPushButton {
        <height>251</height>
       </rect>
      </property>
+     <property name="styleSheet">
+         <string notr="true">QPushButton {
+            background-color: transparent;
+            font-size: 10px;
+            border:2px solid white;
+            color:white;
+           
+        }
+         QPushButton:hover {
+            border: 2px solid #ffd740;  
+            color: #ffd740;                    /* Change border color on hover */
+        }</string>
+        </property>
      <layout class="QVBoxLayout" name="verticalLayout">
       <item>
        <widget class="QPushButton" name="pushButton_3">
-        <property name="styleSheet">
-         <string notr="true">QPushButton {
-    background-color: transparent;
-}</string>
-        </property>
+        
         <property name="text">
          <string>Seeding</string>
         </property>
@@ -215,12 +302,6 @@ QPushButton {
       </item>
       <item>
        <widget class="QPushButton" name="pushButton_5">
-        <property name="styleSheet">
-         <string notr="true">QPushButton {
-    background-color: transparent;
-}
-</string>
-        </property>
         <property name="text">
          <string>Downloading</string>
         </property>
@@ -228,11 +309,6 @@ QPushButton {
       </item>
       <item>
        <widget class="QPushButton" name="pushButton_4">
-        <property name="styleSheet">
-         <string notr="true">QPushButton {
-    background-color: transparent;
-}</string>
-        </property>
         <property name="text">
          <string>Uploading</string>
         </property>
@@ -240,11 +316,6 @@ QPushButton {
       </item>
       <item>
        <widget class="QPushButton" name="pushButton_2">
-        <property name="styleSheet">
-         <string notr="true">QPushButton {
-    background-color: transparent;
-}</string>
-        </property>
         <property name="text">
          <string>Paused</string>
         </property>
@@ -252,11 +323,6 @@ QPushButton {
       </item>
       <item>
        <widget class="QPushButton" name="pushButton">
-        <property name="styleSheet">
-         <string notr="true">QPushButton {
-    background-color: transparent;
-}</string>
-        </property>
         <property name="text">
          <string>Completed</string>
         </property>

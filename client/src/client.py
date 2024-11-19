@@ -1,3 +1,4 @@
+import json
 from queue import Queue
 import socket
 import time
@@ -43,9 +44,6 @@ class TorrentClient:
             params = TorrentUtils.parse_uploaded_torrent(uploader_info)
             self.init_uploader(params)
 
-        if cli:
-            threading.Thread(target=self.periodic_update_console, daemon=True).start()
-
         # ----------------- Server socket -----------------
 
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -67,6 +65,9 @@ class TorrentClient:
         self.peer_connections: dict[str, PeerConnection] = dict()
         self.piece_manager = PieceManager(peer_list=self.peer_list,
                                           metadata=self.metadata, pieces=self.pieces, client=self)
+
+        if cli:
+            threading.Thread(target=self.periodic_update_console, daemon=True).start()
 
         self.connected_to_peers = False
         self.init_connections()
@@ -196,9 +197,24 @@ class TorrentClient:
         return self.piece_manager.get_progress()
 
     def get_peers(self, id_list=None) -> list[tuple[str, int]]:
-        if id_list:
+        if id_list is not None:
             return [(c.ip, c.port) for c in self.peer_connections.values() if c.id in id_list]
         return [(c.ip, c.port) for c in self.peer_connections.values()]
+
+    def get_self_torrent_info(self):
+        seeds = len(self.piece_manager.not_interest_peers)
+        peers = len(self.peer_connections)
+        return {
+            'name': self.piece_manager.metadata['name'],
+            'status': self.status,
+            'downloaded': self.piece_manager.downloaded,
+            'uploaded': self.piece_manager.uploaded,
+            'downspeed': self.piece_manager.dl_speed,
+            'upspeed': self.piece_manager.up_speed,
+            'left': self.piece_manager.left,
+            'seeds': seeds,
+            'peers': peers,
+        }
 
     # -------------------------------------------------
     # -------------------------------------------------
@@ -256,6 +272,7 @@ class TorrentClient:
                     self.log(f"Requesting block {args} to peer {ip}, {port} ...\n")
 
         self.log(f"\n{'-'*40}\n{'\t\tDownload complete!!\n'*3}\n{'-'*40}\n{'-'*40}")
+        self.status = 'completed'
         self.downloading = False
         self.piece_manager.merge_all_pieces(self.download_dir)
         threading.Thread(target=self.start_uploading_only, daemon=True).start()
@@ -266,6 +283,13 @@ class TorrentClient:
             connection.seeding()
 
     def periodic_update_console(self):
+        threading.Thread(target=self.print_progress_periodically, daemon=True).start()
         while True:
             print(self.get_console_output(), end="")
-        return
+
+    def print_progress_periodically(self):
+        while True:
+            # progress = self.get_progress()
+            # if progress:
+            #     print(json.dumps(progress, indent=2))
+            time.sleep(10)

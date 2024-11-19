@@ -7,6 +7,7 @@ conda create -n p2p python -y
 conda activate p2p
 pip install -r requirements.txt
 pip install pyqt6-tools
+pip install qt_material
 ```
 
 ## Run tracker server

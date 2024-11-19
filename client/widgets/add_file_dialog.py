@@ -1,6 +1,8 @@
 import os
 from PyQt6.QtWidgets import *
+from PyQt6.QtCore import Qt, QTimer
 import requests
+
 
 class AddFileDialogMagnet(QDialog):
     def __init__(self):
@@ -41,11 +43,16 @@ class AddFileDialogMagnet(QDialog):
             self.save_dir.setText(folder_path)
 
     def accept(self):
-        self.result = (self.input.text(), self.save_dir.text())
+        self.magnet_link = self.input.text()
+        self.download_dir = self.save_dir.text()
         self.done(1)
 
     def get_result(self):
-        return self.result
+        return {
+            'magnet_link': self.result[0],
+            'download_dir': self.result[1]
+        }
+
 
 class AddFileDialogTorrent(QDialog):
     def __init__(self):
@@ -118,7 +125,8 @@ class AddFileDialogTorrent(QDialog):
 
     def accept(self):
         if os.path.isdir(self.save_dir.text()):
-            self.result = (self.selected_file, self.save_dir.text())
+            self.torrent_file_path = self.selected_file
+            self.download_dir = self.save_dir.text()
             self.done(1)
         else:
             warning_dialog = QMessageBox()
@@ -129,7 +137,10 @@ class AddFileDialogTorrent(QDialog):
             warning_dialog.exec()
 
     def get_result(self):
-        return self.result
+        return {
+            'torrent_file': self.torrent_file_path,
+            'download_dir': self.download_dir
+        }
 
 
 class CreateTorrentDialog(QDialog):
@@ -144,7 +155,8 @@ class CreateTorrentDialog(QDialog):
         file_selection_layout = QVBoxLayout()
         self.file_path = QLineEdit()
         self.file_path.setPlaceholderText("Select Directory")
-        # self.file_path.setText('D:/STUDY/Semester241/MMT/slide')
+        self.file_path.setText('D:/STUDY/Semester241/MMT/slide')
+        self.file_path.setStyleSheet("color: white;")
         file_buttons_layout = QHBoxLayout()
         select_file_button = QPushButton("Select file")
         select_folder_button = QPushButton("Select folder")
@@ -178,7 +190,49 @@ class CreateTorrentDialog(QDialog):
         piece_boundary_label = QLabel("Align to piece boundary for files larger than:")
         piece_boundary_combo = QComboBox()
         piece_boundary_combo.addItems(["512 KiB", "1 MiB", "2 MiB"])
+        piece_boundary_combo.setStyleSheet("""
+            QComboBox {
+                color: white;
+                background-color: black;
+                border: 1px solid gray;
+            }
+            QComboBox QAbstractItemView {
+                color: white;
+                background-color: black;
+            }
+        """)
+        piece_size_combo.setStyleSheet("""
+            QComboBox {
+                color: white;
+                background-color: black;
+                border: 1px solid gray;
+            }
+            QComboBox QAbstractItemView {
+                color: white;
+                background-color: black;
+            }
+        """)
+        button_style = """
+QPushButton {
+    border: 1px solid white;
+    border-radius: 5px;
+    color: white;
+    background-color: transparent;
+    font-size:12px;
+    padding-top: -3px;
+    padding-bottom: -3px;
+}
+QPushButton:hover {
+    border: 1px solid #ffd740;  
+    background-color: #202020;  
+}
+QPushButton:pressed {
+    border: 1px solid #ffb300;  
+    background-color: #303030;  
+}
 
+"""
+        self.setStyleSheet(button_style)
         # Adding widgets to settings layout
         settings_layout.addWidget(piece_size_label, 0, 0)
         settings_layout.addWidget(piece_size_combo, 0, 1)
@@ -201,8 +255,7 @@ class CreateTorrentDialog(QDialog):
         fields_layout = QFormLayout()
 
         self.tracker_urls = QTextEdit()
-        # self.tracker_urls.setText('http://localhost:8000/announce')
-        self.tracker_urls.setText('https://10diembtl.ngrok.app/announce')
+        self.tracker_urls.setText('http://localhost:8000/announce')
         fields_layout.addRow("Tracker URLs:", self.tracker_urls)
 
         save_torrent_dir_layout = QHBoxLayout()
@@ -210,7 +263,8 @@ class CreateTorrentDialog(QDialog):
 
         self.save_torrent_path = QLineEdit()
         self.save_torrent_path.setPlaceholderText("Select Directory")
-        # self.save_torrent_path.setText('D:/STUDY/Semester241/MMT')
+        self.save_torrent_path.setText('D:/STUDY/Semester241/MMT')
+        self.save_torrent_path.setStyleSheet("color: white;")
 
         file_buttons_layout = QHBoxLayout()
         select_folder_torrent_button = QPushButton("Browse")
@@ -283,6 +337,7 @@ class CreateTorrentDialog(QDialog):
         try:
             tracker_response = requests.get(tracker_url.replace("announce", "")).content
             if tracker_response != b'"xyz"':
+                print(tracker_response)
                 raise requests.exceptions.RequestException
         except requests.exceptions.RequestException:
             QMessageBox.critical(self, "Error", "The tracker URL is invalid.")
@@ -301,32 +356,54 @@ class CreateTorrentDialog(QDialog):
         self.done(1)
 
     def get_result(self):
-        return self.result
+        return {
+            'uploader_info': self.result
+        }
 
 
-class ConfigFormTorrent(QDialog):
-    def __init__(self, display_name, file_names, info):
-        super().__init__()
-        self.setWindowTitle(display_name)
-        self.setGeometry(100, 100, 300, 400)
+class ProgressBarDelegate(QStyledItemDelegate):
+    def paint(self, painter, option, index):
+        progress = int(index.data(Qt.ItemDataRole.DisplayRole) or 0)
+        progress_bar = QProgressBar()
+        progress_bar.setValue(progress)
+        progress_bar.setTextVisible(False)
+        progress_bar.setGeometry(option.rect)
+        progress_bar.render(painter, option.rect.topLeft())
 
-        main_layout = QVBoxLayout()
+        progress_bar.setStyleSheet("""
+            QProgressBar::chunk {
+                background-color: #4CAF50;  # Green color
+            }
+            QProgressBar {
+                border: 1px solid #555;
+                background-color: #f1f1f1;
+            }
+        """)
 
-        self.label = QLabel("Select a file to download:")
-        main_layout.addWidget(self.label)
+        progress_bar.render(painter, option.rect.topLeft())
 
-        # Create a QListWidget to display file names
-        self.file_list_widget = QListWidget()
-        self.file_list_widget.addItems(file_names)  # Add file names to the list widget
-        main_layout.addWidget(self.file_list_widget)
 
-        # Add an OK button to confirm selection
-        self.ok_button = QPushButton("OK")
-        self.ok_button.clicked.connect(self.accept)
-        main_layout.addWidget(self.ok_button)
+class LoadingScreen(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Loading...")
+        self.setModal(True)  # Blocks interaction with other windows while active
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
-        self.setLayout(main_layout)
+        # Layout and widgets
+        layout = QVBoxLayout()
+        self.label = QLabel("Loading, please wait...")
+        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label)
 
-    def get_selected_files(self):
-        selected_items = self.file_list_widget.selectedItems()
-        return [item.text() for item in selected_items]
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 0)  # Infinite progress bar
+        layout.addWidget(self.progress)
+
+        self.setLayout(layout)
+        self.setFixedSize(300, 150)
+
+    def set_message(self, message):
+        """Update the loading message."""
+        self.label.setText(message)

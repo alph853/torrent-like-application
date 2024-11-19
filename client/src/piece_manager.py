@@ -17,17 +17,36 @@ class DownloadingFSM(enumerate):
     META_DOWN, PIECE_FIND, PIECE_REQ, PIECE_REQ_DONE, DOWN_DONE, SEEDING = range(6)
 
 class PieceManager:
-    def __init__(self, peer_list, metadata: dict, pieces: dict, client, piece_size=512*1024, block_size=64*1024, num_unchoked=4):
+    def __init__(self, peer_list, metadata: dict, pieces: dict, client, piece_size=512*1024, block_size=64*1024, num_unchoked=2):
         self.piece_size = piece_size
         self.block_size = block_size
         self.metadata = metadata
-        self.num_unchoked = num_unchoked
-        self.peer_upload = {peer['id']: 0 for peer in peer_list}
+        self.pieces = pieces                    # Pieces the client holds
         self.client = client
+
+        self.peer_upload = {peer['id']: 0 for peer in peer_list}
+
+        self.num_unchoked = num_unchoked
+        self.unchoked_peers = []
+        self.optimistic_unchoked_peer = None
+
         self.not_interest_peers = []
         self.top_uploaders = []
-        self.optimistic_unchoked_peer = None
-        self.unchoked_peers = []
+
+        self.file_manager = None
+        self.piece2file_map = None
+
+        self.downloaded = 0
+        self.uploaded = 0
+        self.left = 0
+        self.total_length = 0
+
+        self.up_mark = 0
+        self.up_speed = 0
+        self.dl_mark = 0
+        self.dl_speed = 0
+
+        threading.Thread(target=self.calculating_speed, daemon=True).start()
 
         if metadata:
             self.metadata_pieces, self.metadata_size = self.split_metadata(metadata, piece_size)
@@ -53,7 +72,6 @@ class PieceManager:
             self.piece_counter = dict()             # Counter of pieces that held by the client
             self.peer_bitfields = {peer['id']: [] for peer in peer_list}
 
-        self.pieces = pieces                    # Pieces the client holds
         self.requesting_blocks = dict()
         self.requesting_piece = None
         self.number_of_blocks = -1
@@ -156,9 +174,6 @@ class PieceManager:
         self.peer_upload[id] = 0
         self.optimistic_unchoked_peer = id
 
-    def set_peer_upload(self, id, upload):
-        self.peer_upload[id] = upload
-
     def add_peer_bitfield(self, id, bitfield: list):
         with lock:
             self.peer_bitfields[id] = bitfield
@@ -212,11 +227,15 @@ class PieceManager:
     def calculating_top_uploaders(self):
         optimistic_timer = 0
         while True:
+            if not self.peer_upload:
+                continue
             not_fully_downloaded_peers = list(set(self.peer_upload.keys()) - set(self.not_interest_peers))
             peer_upload = {id: self.peer_upload[id] for id in not_fully_downloaded_peers}
 
-            top_uploaders = Counter(peer_upload).most_common(self.num_unchoked)
-            self.top_uploaders = [id for id, _ in top_uploaders]
+            if self.state == DownloadingFSM.SEEDING:
+                self.top_uploaders = random.sample(list(peer_upload.keys()), min(self.num_unchoked, len(peer_upload)))
+            else:
+                self.top_uploaders = [id for id, _ in Counter(peer_upload).most_common(self.num_unchoked)]
 
             time.sleep(10)
 
@@ -226,14 +245,24 @@ class PieceManager:
                 if remaining_peers:
                     self.optimistic_unchoked_peer = random.choice(remaining_peers)
                 optimistic_timer = 0
-            self.client.log(f'\nRegular "calculating_top_uploaders" routine update {'-' * 10}\n\nTop uploaders: {self.client.get_peers(
+            self.client.log(f'\nRegular "calculating top uploaders" routine update {'-' * 10}\n\nTop uploaders: {self.client.get_peers(
                 self.top_uploaders)}\nOptimistic Unchoked Peer: {self.client.get_peers([self.optimistic_unchoked_peer])}\n{'-' * 61}\n\n')
 
+    def calculating_speed(self):
+        while True:
+            self.up_mark = self.uploaded
+            self.dl_mark = self.downloaded
+            time.sleep(1)
+            self.up_speed = (self.uploaded - self.up_mark)
+            self.dl_speed = (self.downloaded - self.dl_mark)
 
     # -------------------------------------------------
     # -------------------------------------------------
     # -------------------------------------------------
     def get_block(self, piece_idx, begin, length):
+        lock.acquire()
+        self.uploaded += length
+        lock.release()
         return self.pieces[piece_idx][begin:begin + length]
 
     def add_requesting_blocks(self, piece_idx, block_requests):
@@ -244,27 +273,31 @@ class PieceManager:
 
     def add_block(self, id, start, block_data):
         self.requesting_blocks[start] = block_data
-        self.set_peer_upload(id, len(block_data))
+        data_sz = len(block_data)
+        self.peer_upload[id] = data_sz
+        self.downloaded += data_sz
+        self.left -= data_sz
 
+        # If acquire all blocks
         if len(self.requesting_blocks.keys()) == self.number_of_blocks:
             self.state = DownloadingFSM.PIECE_REQ_DONE
-            self.merge_blocks_to_piece()
+            self.unchoked_peers = []
+            piece_data = b''.join([self.requesting_blocks[i] for i in sorted(self.requesting_blocks.keys())])
+            self.pieces[self.requesting_piece] = piece_data
 
-    def merge_blocks_to_piece(self):
-        piece_data = b''.join([self.requesting_blocks[i] for i in sorted(self.requesting_blocks.keys())])
-        self.pieces[self.requesting_piece] = piece_data
-        piece_map_info = self.piece2file_map[self.requesting_piece]
-        self.unchoked_peers = []
+            # update download progress
+            for file in self.piece2file_map[self.requesting_piece]:
+                length_in_file = file['length_in_file']
+                file_key = file['file']
+                file_length = self.file_manager[file_key]['length']
 
-        for file in piece_map_info:
-            length_in_file = file['length_in_file']
-            file_key = file['file']
+                if file_length != 0:
+                    add_percentage = length_in_file / file_length
+                else:
+                    add_percentage = 0
+                self.file_manager[file_key]['downloaded'] += add_percentage
+                self.file_manager[file_key]['remaining'] -= length_in_file
 
-            if self.file_manager[file_key]['length'] != 0:
-                add_percentage = round(length_in_file / self.file_manager[file_key]['length'], 2) * 100
-            else:
-                add_percentage = 0
-            self.file_manager[file_key]['downloaded'] += add_percentage
             self.delete_piece(self.requesting_piece)
 
     def is_piece_request_done(self) -> int | None:
@@ -304,16 +337,29 @@ class PieceManager:
             length = file['length']
             self.file_manager[file_path] = {
                 'length': length,
-                'downloaded': 100 if length == 0 else 0
+                'downloaded': 1 if self.pieces != {} or length == 0 else 0,
+                'remaining': length if not self.pieces else 0
             }
+            self.total_length += length
 
-        # print('File manager:', json.dumps(self.file_manager, indent=2, default=bytes_serializer))
-        # print('Piece to file map:', json.dumps(self.piece2file_map, indent=2, default=bytes_serializer))
+        if self.pieces:
+            self.downloaded = self.total_length
+            self.left = 0
 
     def get_progress(self):
-        progress = {file: self.file_manager[file]['downloaded'] for file in self.file_manager}
-        progress = list(progress.items())
-        return progress
+        if self.file_manager:
+            progress = []
+            for file_name in self.file_manager.keys():
+                file = self.file_manager[file_name]
+                progress.append({
+                    'filename': file_name,
+                    'totalsize': file['length'],
+                    'remaining': file['remaining'],
+                    'progress': file['downloaded']
+                })
+            # print(json.dumps(progress, indent=2))
+            return progress
+        return None
 
     def print_self_info(self):
         print(json.dumps({
@@ -322,6 +368,7 @@ class PieceManager:
             'number_of_pieces': self.number_of_pieces,
             'peer_bitfields': self.peer_bitfields
         }, indent=2, default=bytes_serializer))
+
 
 
 def bytes_serializer(obj):
