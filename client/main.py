@@ -131,6 +131,7 @@ class MainWindow(QMainWindow):
     def on_table_row_clicked(self, index: QModelIndex):
         global GLOBAL_ID
         GLOBAL_ID = index.row()
+        self.files_model.removeRows(0, self.files_model.rowCount())
 
     def limit_column_width(self, logicalIndex, oldSize, newSize):
         total_width = sum(self.tableView.horizontalHeader().sectionSize(i)
