@@ -31,6 +31,7 @@ def get_ip_and_port():
 
 class MainWindow(QMainWindow):
     update_peers_signal = pyqtSignal(str)
+    update_console_signal = pyqtSignal(str)
     update_download_progress_signal = pyqtSignal(list)
     update_download_torrent_signal = pyqtSignal(list)
     previous_peers = None
@@ -61,7 +62,9 @@ class MainWindow(QMainWindow):
         self.actionAdd_Magnet_Link.triggered.connect(self.add_magnet_link)
         self.actionCreate_Torrent_2.triggered.connect(self.create_torrent)
         self.label_peers = self.findChild(QLabel, 'label_peers')
+        self.label_general = self.findChild(QLabel, 'label_general')
         self.update_peers_signal.connect(self.update_peers_label)
+        self.update_console_signal.connect(self.update_general_label)
         self.update_download_progress_signal.connect(self.update_download_progress)
         self.update_download_torrent_signal.connect(self.update_torrent_progress)
 
@@ -185,8 +188,12 @@ class MainWindow(QMainWindow):
 
     def display_console(self, client: TorrentClient):
         while self.current_tab_idx == 0:
-            self.console.append(client.get_console_output())
+            self.update_console_signal.emit(client.get_console_output())
             time.sleep(0.5)
+
+    def update_general_label(self, text: str):
+        """Update the peers label with formatted text."""
+        self.label_general.setText(text)
 
     def display_download_progress(self, client: TorrentClient):
         while self.current_tab_idx == 2:
@@ -264,6 +271,8 @@ class MainWindow(QMainWindow):
     def update_peers_label(self, text: str):
         """Update the peers label with formatted text."""
         self.label_peers.setText(text)
+
+    
 
 
 if __name__ == "__main__":

@@ -169,6 +169,11 @@ QTabBar::tab:!selected {
        <attribute name="title">
         <string>General</string>
        </attribute>
+        <widget class="QLabel" name="label_general">
+    <property name="text">
+        <string>Console...</string>
+    </property>
+</widget>
       </widget>
       <widget class="QWidget" name="tab_6">
       
