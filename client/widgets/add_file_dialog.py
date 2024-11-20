@@ -1,7 +1,8 @@
 import os
 from PyQt6.QtWidgets import *
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt
 import requests
+from PyQt6.QtGui import QPalette, QColor
 
 
 class AddFileDialogMagnet(QDialog):
@@ -49,8 +50,8 @@ class AddFileDialogMagnet(QDialog):
 
     def get_result(self):
         return {
-            'magnet_link': self.result[0],
-            'download_dir': self.result[1]
+            'magnet_link': self.magnet_link,
+            'download_dir': self.download_dir
         }
 
 
@@ -155,7 +156,7 @@ class CreateTorrentDialog(QDialog):
         file_selection_layout = QVBoxLayout()
         self.file_path = QLineEdit()
         self.file_path.setPlaceholderText("Select Directory")
-        self.file_path.setText('D:/STUDY/Semester241/MMT/slide')
+        self.file_path.setText('D:/HK241/Database/Lecture-20240903T015208Z-001/Lecture')
         self.file_path.setStyleSheet("color: white;")
         file_buttons_layout = QHBoxLayout()
         select_file_button = QPushButton("Select file")
@@ -255,7 +256,7 @@ QPushButton:pressed {
         fields_layout = QFormLayout()
 
         self.tracker_urls = QTextEdit()
-        self.tracker_urls.setText('http://localhost:8000/announce')
+        self.tracker_urls.setText('https://10diembtl.ngrok.app/announce')
         fields_layout.addRow("Tracker URLs:", self.tracker_urls)
 
         save_torrent_dir_layout = QHBoxLayout()
@@ -263,7 +264,7 @@ QPushButton:pressed {
 
         self.save_torrent_path = QLineEdit()
         self.save_torrent_path.setPlaceholderText("Select Directory")
-        self.save_torrent_path.setText('D:/STUDY/Semester241/MMT')
+        self.save_torrent_path.setText('C:/Users/DELL/Documents')
         self.save_torrent_path.setStyleSheet("color: white;")
 
         file_buttons_layout = QHBoxLayout()
@@ -364,41 +365,64 @@ QPushButton:pressed {
 class ProgressBarDelegate(QStyledItemDelegate):
     def paint(self, painter, option, index):
         progress = int(index.data(Qt.ItemDataRole.DisplayRole) or 0)
-        progress_bar = QProgressBar()
-        progress_bar.setValue(progress)
-        progress_bar.setTextVisible(False)
-        progress_bar.setGeometry(option.rect)
-        progress_bar.render(painter, option.rect.topLeft())
 
-        progress_bar.setStyleSheet("""
-            QProgressBar::chunk {
-                background-color: #4CAF50;  # Green color
-            }
-            QProgressBar {
-                border: 1px solid #555;
-                background-color: #f1f1f1;
-            }
-        """)
+        # Save the painter state
+        painter.save()
 
-        progress_bar.render(painter, option.rect.topLeft())
+        # Create a QStyleOptionProgressBar
+        progress_bar_option = QStyleOptionProgressBar()
+        rect = option.rect
+        rect.setHeight(rect.height() + 10)  # Increase the height by 10 pixels
+        progress_bar_option.rect = rect
+        progress_bar_option.minimum = 0
+        progress_bar_option.maximum = 100
+        progress_bar_option.progress = progress
+        progress_bar_option.text = f"{progress}%"
+        progress_bar_option.textVisible = True
+
+        # Apply the palette colors
+        palette = QPalette()
+        palette.setColor(QPalette.ColorRole.Highlight, QColor("#4CAF50"))  # Green color for the bar
+        palette.setColor(QPalette.ColorRole.Base, QColor("#f1f1f1"))       # Background color
+        palette.setColor(QPalette.ColorRole.WindowText, QColor("#3e3e3e"))  # Text color
+        progress_bar_option.palette = palette
+
+        # Draw the progress bar
+        QApplication.style().drawControl(QStyle.ControlElement.CE_ProgressBar, progress_bar_option, painter)
+
+        # Restore the painter state
+        painter.restore()
+
+    def createEditor(self, parent, option, index):
+        progress_bar = QProgressBar(parent)
+        progress_bar.setMinimum(0)
+        progress_bar.setMaximum(100)
+        return progress_bar
+
+    def setEditorData(self, editor, index):
+        progress = index.data(Qt.ItemDataRole.DisplayRole)
+        if progress is not None:
+            editor.setValue(int(progress))
+
+    def setModelData(self, editor, model, index):
+        model.setData(index, editor.value())
 
 
 class LoadingScreen(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Loading...")
-        self.setModal(True)  # Blocks interaction with other windows while active
+        self.setModal(True)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
-        # Layout and widgets
         layout = QVBoxLayout()
         self.label = QLabel("Loading, please wait...")
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.label)
 
         self.progress = QProgressBar()
-        self.progress.setRange(0, 0)  # Infinite progress bar
+        self.progress.setRange(0, 0)
         layout.addWidget(self.progress)
 
         self.setLayout(layout)

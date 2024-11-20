@@ -63,7 +63,6 @@ class TorrentUtilsClass:
         display_name = metadata['name']
         info_hash = self.compute_info_hash(torrent_content).hex()
 
-
         return info_hash, tracker_url, display_name, metadata
 
     def parse_compacted_peer_list(self, peer_compacted_string) -> list[dict]:
@@ -180,7 +179,8 @@ class TorrentUtilsClass:
     def generate_magnet_link(info_hash, tracker_url, display_name, save_torrent_dir=None):
         magnet_link = f"magnet:?xt=urn:btih:{info_hash}&dn={display_name}&tr={tracker_url}"
         if save_torrent_dir:
-            with open(os.path.join(save_torrent_dir, f'{display_name}.txt'), 'w') as f:
+            save_magnet_path = os.path.join(save_torrent_dir, f'{display_name}.txt')
+            with open(os.path.join(save_magnet_path), 'w') as f:
                 f.write(magnet_link)
 
         return magnet_link

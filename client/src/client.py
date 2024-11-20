@@ -74,7 +74,7 @@ class TorrentClient:
 
         if not uploader_info:
             while not self.connected_to_peers:
-                time.sleep(0.2)
+                time.sleep(0.5)
             threading.Thread(target=self.start_downloading, daemon=True).start()
         else:
             threading.Thread(target=self.start_uploading_only, daemon=True).start()
@@ -123,7 +123,7 @@ class TorrentClient:
         self.log(f"New connection from {addr}")
         try:
             connection = PeerConnection(self.info_hash, self.peer_id, sock,
-                                        target_peer, self.piece_manager, outgoing=False, client_log_function=self.log)
+                                        target_peer, self.piece_manager, outgoing=False, client=self)
             self.peer_connections[target_peer['id']] = connection
             self.piece_manager.add_peer(target_peer['id'])
             self.log(f"Successfully add connection to peer {target_peer['ip']}, {target_peer['port']}\n")
@@ -144,13 +144,17 @@ class TorrentClient:
         try:
             sock.connect((target_peer['ip'], target_peer['port']))
             connection = PeerConnection(self.info_hash, self.peer_id, sock,
-                                        target_peer, self.piece_manager, outgoing=True, client_log_function=self.log)
+                                        target_peer, self.piece_manager, outgoing=True, client=self)
             self.peer_connections[target_peer['id']] = connection
             self.log(f"Successfully connect to peer {target_peer['ip']}, {target_peer['port']}\n")
             self.connected_to_peers = True
         except Exception as e:
             self.log(f"Failed to connect to peer {target_peer['ip']}, {target_peer['port']}: {e}")
 
+    def remove_connection(self, id):
+        # self.peer_connections.pop(id)
+        # self.piece_manager.remove_peer(id)
+        pass
     # -------------------------------------------------
     # -------------------------------------------------
 
@@ -225,13 +229,14 @@ class TorrentClient:
         """
         while not self.is_metadata_complete():
             self.log("Waiting for metadata...\n")
-            time.sleep(3)
+            time.sleep(2)
 
         self.log("Metadata downloaded!\n")
 
         success_get_unchoked_peers = False
         while not self.piece_manager.is_done_downloading():
             if self.piece_manager.is_waiting_for_piece_response():
+                time.sleep(0.5)
                 continue
 
             piece = self.piece_manager.is_piece_request_done()
@@ -250,11 +255,12 @@ class TorrentClient:
                 for id in peers:
                     self.peer_connections[id].send_interest_message()
 
-                time.sleep(0.2)  # Wait for peers to respond
+                time.sleep(0.25)  # Wait for peers to respond
 
                 unchoked_peers = self.piece_manager.get_unchoked_peers()
                 if not unchoked_peers:
                     self.log("Trying to get unchoked peers...\n")
+                    time.sleep(1)
                     continue
                 success_get_unchoked_peers = True
 

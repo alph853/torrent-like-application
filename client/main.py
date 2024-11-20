@@ -2,7 +2,7 @@ import socket
 import time
 from PyQt6.QtWidgets import *
 from PyQt6.QtGui import QIcon, QFont, QStandardItem, QStandardItemModel
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QModelIndex
 from PyQt6.uic import loadUi
 import sys
 from widgets.add_file_dialog import *
@@ -32,6 +32,7 @@ def get_ip_and_port():
 class MainWindow(QMainWindow):
     update_peers_signal = pyqtSignal(str)
     update_download_progress_signal = pyqtSignal(list)
+    update_download_torrent_signal = pyqtSignal(list)
     previous_peers = None
 
     def __init__(self):
@@ -62,6 +63,7 @@ class MainWindow(QMainWindow):
         self.label_peers = self.findChild(QLabel, 'label_peers')
         self.update_peers_signal.connect(self.update_peers_label)
         self.update_download_progress_signal.connect(self.update_download_progress)
+        self.update_download_torrent_signal.connect(self.update_torrent_progress)
 
         self.tabWidget = self.findChild(QTabWidget, 'tabWidget')
         self.tabWidget.currentChanged.connect(self.on_tab_changed)
@@ -88,13 +90,6 @@ class MainWindow(QMainWindow):
 
     def add_magnet_link(self):
         self.start_torrent_client(AddFileDialogMagnet)
-
-    def display_torrent_table(self):
-        # while True:
-        #     for client in TORRENT_CLIENT_LIST:
-        #         torrent = client.get_self_torrent_info()
-        #     time.sleep(0.5)
-        pass
 
     def display_torrent_info(self):
         while True:
@@ -128,9 +123,9 @@ class MainWindow(QMainWindow):
         delegate = ProgressBarDelegate()
         self.tableWidgetContent.setItemDelegateForColumn(3, delegate)
 
-    def on_table_row_clicked(self, row, column):
+    def on_table_row_clicked(self, index: QModelIndex):
         global GLOBAL_ID
-        GLOBAL_ID = row
+        GLOBAL_ID = index.row()
 
     def limit_column_width(self, logicalIndex, oldSize, newSize):
         total_width = sum(self.tableView.horizontalHeader().sectionSize(i)
@@ -169,7 +164,6 @@ class MainWindow(QMainWindow):
                 continue
 
             if self.current_tab_idx != self.previous_tab_idx:
-                print(self.current_tab_idx)
                 client = TORRENT_CLIENT_LIST[GLOBAL_ID]
                 if active_thread:
                     active_thread.join()
@@ -197,7 +191,13 @@ class MainWindow(QMainWindow):
     def display_download_progress(self, client: TorrentClient):
         while self.current_tab_idx == 2:
             progress_list = client.get_progress()
-            self.update_download_progress_signal.emit(progress_list)  # Emit signal for download progress
+            self.update_download_progress_signal.emit(progress_list)
+            time.sleep(0.5)
+
+    def display_torrent_table(self):
+        while True:
+            torrent_list = [client.get_self_torrent_info() for client in TORRENT_CLIENT_LIST]
+            self.update_download_torrent_signal.emit(torrent_list)
             time.sleep(0.5)
 
     def update_download_progress(self, progress_list: list):
@@ -210,7 +210,7 @@ class MainWindow(QMainWindow):
                     self.files_model.setItem(row, 1, QStandardItem(f"{file_info['totalsize']} B"))
                     self.files_model.setItem(row, 2, QStandardItem(f"{file_info['remaining']} B"))
                     self.files_model.setItem(row, 3, QStandardItem(
-                        str(round(file_info['progress'], 2)*100)))  # Progress as string
+                        str(int(round(file_info['progress'], 2)*100))))  # Progress as string
                     found = True
                     break
             if not found:
@@ -218,7 +218,33 @@ class MainWindow(QMainWindow):
                     QStandardItem(file_info['filename']),
                     QStandardItem(f"{file_info['totalsize']} B"),
                     QStandardItem(f"{file_info['remaining']} B"),
-                    QStandardItem(str(round(file_info['progress'], 2)*100))  # Progress as string
+                    QStandardItem(str(int(round(file_info['progress'], 2)*100)))  # Progress as string
+                ])
+
+    def update_torrent_progress(self, progress_list: list):
+        for file_info in progress_list:
+            found = False
+            for row in range(self.torrent_model.rowCount()):
+                item = self.torrent_model.item(row, 0)
+                if item and item.text() == file_info['name']:
+                    self.torrent_model.setItem(row, 2, QStandardItem(f"{file_info['status']}"))
+                    self.torrent_model.setItem(row, 5, QStandardItem(f"{file_info['upspeed']} B/s"))
+                    self.torrent_model.setItem(row, 6, QStandardItem(f"{file_info['downspeed']} B/s"))
+                    self.torrent_model.setItem(row, 1, QStandardItem(
+                        # Progress as string
+                        str(int(round((file_info['downloaded'])/(file_info['downloaded']+file_info['left']), 2)*100))))
+                    found = True
+                    break
+            if not found:
+                self.torrent_model.appendRow([
+                    QStandardItem(file_info['name']),
+                    QStandardItem(str(int(round((file_info['downloaded']) /
+                                  (file_info['downloaded']+file_info['left']), 2)*100))),
+                    QStandardItem(file_info['status']),
+                    QStandardItem(f"{file_info['seeds']}"),
+                    QStandardItem(f"{file_info['peers']}"),
+                    QStandardItem(f"{file_info['upspeed']}"),
+                    QStandardItem(f"{file_info['downspeed']}"),
                 ])
 
     def display_peers(self, client: TorrentClient):

@@ -344,7 +344,8 @@ class PieceManager:
 
         if self.pieces:
             self.downloaded = self.total_length
-            self.left = 0
+        else:
+            self.left = self.total_length
 
     def get_progress(self):
         if self.file_manager:
