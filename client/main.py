@@ -39,8 +39,9 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         ui_path = os.path.join(os.path.dirname(__file__), "main.ui")
+        logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
         loadUi(ui_path, self)
-        self.setWindowIcon(QIcon("logo.png"))
+        self.setWindowIcon(QIcon(logo_path))
         self.setWindowTitle("BitTorrent")
 
         for button in self.findChildren(QPushButton):
@@ -62,7 +63,8 @@ class MainWindow(QMainWindow):
         self.actionAdd_Magnet_Link.triggered.connect(self.add_magnet_link)
         self.actionCreate_Torrent_2.triggered.connect(self.create_torrent)
         self.label_peers = self.findChild(QLabel, 'label_peers')
-        self.label_general = self.findChild(QLabel, 'label_general')
+        self.label_general = self.findChild(QTextEdit, 'label_general')
+        self.label_general.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.update_peers_signal.connect(self.update_peers_label)
         self.update_console_signal.connect(self.update_general_label)
         self.update_download_progress_signal.connect(self.update_download_progress)
@@ -82,8 +84,15 @@ class MainWindow(QMainWindow):
         dialog = dialog_class()
 
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            client = TorrentClient(**get_ip_and_port(), **dialog.get_result())
-            TORRENT_CLIENT_LIST.append(client)
+            threading.Thread(target=self.init_client, daemon=True, kwargs=(
+                {**get_ip_and_port(), **dialog.get_result()})).start()
+
+    def init_client(self, **kwargs):
+        client = TorrentClient(**kwargs)
+        TORRENT_CLIENT_LIST.append(client)
+
+        while True:
+            continue
 
     def create_torrent(self):
         self.start_torrent_client(CreateTorrentDialog)
@@ -93,13 +102,6 @@ class MainWindow(QMainWindow):
 
     def add_magnet_link(self):
         self.start_torrent_client(AddFileDialogMagnet)
-
-    def display_torrent_info(self):
-        while True:
-            if not TORRENT_CLIENT_LIST:
-                continue
-            client = TORRENT_CLIENT_LIST[GLOBAL_ID]
-            time.sleep(0.1)
 
     def setup_torrent_table(self):
         self.torrent_model.setHorizontalHeaderLabels(
@@ -174,7 +176,7 @@ class MainWindow(QMainWindow):
                     target=self.display_thread_functions[self.current_tab_idx], daemon=True, args=(client, ))
                 active_thread.start()
                 self.previous_tab_idx = self.current_tab_idx
-            time.sleep(0.1)
+            time.sleep(1)
 
     def display_loading_screen(self):
         if not self.loading_screen:
@@ -189,23 +191,24 @@ class MainWindow(QMainWindow):
     def display_console(self, client: TorrentClient):
         while self.current_tab_idx == 0:
             self.update_console_signal.emit(client.get_console_output())
-            time.sleep(0.5)
+            time.sleep(1)
 
     def update_general_label(self, text: str):
         """Update the peers label with formatted text."""
-        self.label_general.setText(text)
+        if self.label_general.toPlainText() != text:
+            self.label_general.setText(text)
 
     def display_download_progress(self, client: TorrentClient):
         while self.current_tab_idx == 2:
             progress_list = client.get_progress()
             self.update_download_progress_signal.emit(progress_list)
-            time.sleep(0.5)
+            time.sleep(1)
 
     def display_torrent_table(self):
         while True:
             torrent_list = [client.get_self_torrent_info() for client in TORRENT_CLIENT_LIST]
             self.update_download_torrent_signal.emit(torrent_list)
-            time.sleep(0.5)
+            time.sleep(1)
 
     def update_download_progress(self, progress_list: list):
         """Update the download progress."""
@@ -261,7 +264,7 @@ class MainWindow(QMainWindow):
             if current_peers != self.previous_peers:
                 self.previous_peers = current_peers
                 self.update_peers_signal.emit(self.format_peers(peers))
-            time.sleep(0.5)
+            time.sleep(1)
 
     def format_peers(self, peers):
         if not peers:
@@ -271,8 +274,6 @@ class MainWindow(QMainWindow):
     def update_peers_label(self, text: str):
         """Update the peers label with formatted text."""
         self.label_peers.setText(text)
-
-    
 
 
 if __name__ == "__main__":

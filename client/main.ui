@@ -6,21 +6,21 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>900</width>
-    <height>900</height>
+    <width>1207</width>
+    <height>841</height>
    </rect>
   </property>
+  <property name="windowTitle">
+   <string>MainWindow</string>
+  </property>
   <property name="styleSheet">
-    <string notr="true">
+   <string notr="true">
         * {
             font-family: 'Verdana';
             font-size: 12px;
         }
         
     </string>
-</property>
-  <property name="windowTitle">
-   <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <property name="enabled">
@@ -32,7 +32,6 @@
      <height>800</height>
     </size>
    </property>
-
    <layout class="QVBoxLayout" name="verticalLayout_5">
     <property name="leftMargin">
      <number>30</number>
@@ -40,7 +39,6 @@
     <property name="rightMargin">
      <number>30</number>
     </property>
-    
     <item>
      <spacer name="horizontalSpacer_2">
       <property name="orientation">
@@ -56,59 +54,29 @@
     </item>
     <item>
      <widget class="QLineEdit" name="lineEdit">
+      <property name="styleSheet">
+       <string>
+            QLineEdit {
+                color: #ecf0f1;  /* Text color */
+            }
+        </string>
+      </property>
       <property name="text">
        <string/>
       </property>
       <property name="placeholderText">
        <string>Filter Torrents ...</string>
       </property>
-      <property name="styleSheet">
-        <string>
-            QLineEdit {
-                color: #ecf0f1;  /* Text color */
-            }
-        </string>
-    </property>
      </widget>
     </item>
     <item>
      <widget class="QTableView" name="tableView">
-        <property name="sizePolicy">
-    <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-     <horstretch>1</horstretch>
-     <verstretch>0</verstretch>
-    </sizepolicy>
-   </property>
-      <column>
-       <property name="text">
-        <string>Name</string>
-       </property>
-      </column>
-      <column>
-       <property name="text">
-        <string>Status</string>
-       </property>
-      </column>
-      <column>
-       <property name="text">
-        <string>Seeds</string>
-       </property>
-      </column>
-      <column>
-       <property name="text">
-        <string>Peers</string>
-       </property>
-      </column>
-      <column>
-       <property name="text">
-        <string>Down Speed</string>
-       </property>
-      </column>
-      <column>
-       <property name="text">
-        <string>Up Speed</string>
-       </property>
-      </column>
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+        <horstretch>1</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
      </widget>
     </item>
     <item>
@@ -127,14 +95,13 @@
     <item>
      <widget class="QTabWidget" name="tabWidget">
       <property name="sizePolicy">
-    <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-     <horstretch>2</horstretch>
-     <verstretch>1</verstretch>
-    </sizepolicy>
-   </property>
-   
-   <property name="styleSheet">
-  <string>
+       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+        <horstretch>2</horstretch>
+        <verstretch>1</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="styleSheet">
+       <string>
  QTabWidget::pane { 
     border: 1px solid #555;  
     background: transparent;
@@ -161,7 +128,7 @@ QTabBar::tab:!selected {
     margin-top: 2px; 
 }
   </string>
- </property>
+      </property>
       <property name="currentIndex">
        <number>0</number>
       </property>
@@ -169,40 +136,49 @@ QTabBar::tab:!selected {
        <attribute name="title">
         <string>General</string>
        </attribute>
-        <widget class="QLabel" name="label_general">
-    <property name="text">
-        <string>Console...</string>
-    </property>
-</widget>
+       <layout class="QVBoxLayout" name="verticalLayout_2">
+        <item>
+         <widget class="QTextEdit" name="label_general">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+          <property name="text" stdset="0">
+           <string>Upload a Torrent with Tools - Create Torrent. Download a Torrent with options in File tab.</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
       </widget>
       <widget class="QWidget" name="tab_6">
-      
        <attribute name="title">
         <string>Peers</string>
        </attribute>
        <widget class="QLabel" name="label_peers">
-    <property name="text">
-        <string>Loading peers...</string>
-    </property>
-</widget>
+        <property name="geometry">
+         <rect>
+          <x>0</x>
+          <y>0</y>
+          <width>98</width>
+          <height>15</height>
+         </rect>
+        </property>
+        <property name="text">
+         <string>Loading peers...</string>
+        </property>
+       </widget>
       </widget>
       <widget class="QWidget" name="tab_7">
        <attribute name="title">
         <string>Content</string>
        </attribute>
        <layout class="QVBoxLayout" name="verticalLayout_tab7">
-  <item>
-   <widget class="QTableView" name="tableWidgetContent">
-    
-    
-   </widget>
-  </item>
- </layout>
+        <item>
+         <widget class="QTableView" name="tableWidgetContent"/>
+        </item>
+       </layout>
       </widget>
-      
      </widget>
     </item>
-    
    </layout>
   </widget>
   <widget class="QMenuBar" name="menubar">
@@ -210,8 +186,8 @@ QTabBar::tab:!selected {
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1360</width>
-     <height>22</height>
+     <width>1207</width>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -241,102 +217,6 @@ QTabBar::tab:!selected {
    <addaction name="menuTools"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
-  <widget class="QDockWidget" name="dockWidget">
-   <property name="minimumSize">
-    <size>
-     <width>205</width>
-     <height>47</height>
-    </size>
-   </property>
-   <property name="styleSheet">
-    <string notr="true">
-
-QPushButton {
-    background-color: transparent;
-    padding-right: 10px;  
-    color:#ecf0f1;
-}
-QDockWidget::close-button,
-        QDockWidget::float-button,
-        QDockWidget::toggle-view-button {
-            background-color:#95a5a6;  
-            border-radius: 2px;               
-        }
-        QDockWidget::close-button:hover,
-        QDockWidget::float-button:hover,
-        QDockWidget::toggle-view-button:hover {
-            background-color: #ffd740;       
-            color: #34495e;                 
-        }
-        </string>
-   </property>
-   <attribute name="dockWidgetArea">
-    <number>1</number>
-   </attribute>
-   <widget class="QWidget" name="dockWidgetContents">
-    <widget class="QWidget" name="verticalLayoutWidget">
-     <property name="geometry">
-      <rect>
-       <x>55</x>
-       <y>20</y>
-       <width>131</width>
-       <height>251</height>
-      </rect>
-     </property>
-     <property name="styleSheet">
-         <string notr="true">QPushButton {
-            background-color: transparent;
-            font-size: 10px;
-            border:2px solid white;
-            color:white;
-           
-        }
-         QPushButton:hover {
-            border: 2px solid #ffd740;  
-            color: #ffd740;                    /* Change border color on hover */
-        }</string>
-        </property>
-     <layout class="QVBoxLayout" name="verticalLayout">
-      <item>
-       <widget class="QPushButton" name="pushButton_3">
-        
-        <property name="text">
-         <string>Seeding</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="pushButton_5">
-        <property name="text">
-         <string>Downloading</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="pushButton_4">
-        <property name="text">
-         <string>Uploading</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="pushButton_2">
-        <property name="text">
-         <string>Paused</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="pushButton">
-        <property name="text">
-         <string>Completed</string>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </widget>
-   </widget>
-  </widget>
   <action name="actionAdd_Torrent_File">
    <property name="text">
     <string>Add Torrent File ...</string>

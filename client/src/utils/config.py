@@ -21,5 +21,5 @@ class ExtensionMessageType(Enum):
     REJECT = 2
 
 
-INIT_STRING = "----------- Simple BitTorrent Application -----------\n"
-INIT_STRING += '-' * len(INIT_STRING) + '\n\n\n'
+INIT_STRING = "----------- Simple BitTorrent Application ----------\n"
+INIT_STRING += '-' * len(INIT_STRING) + '--' + '\n\n\n'

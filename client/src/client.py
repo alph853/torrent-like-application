@@ -9,6 +9,7 @@ from .utils import TorrentUtils, MagnetUtils, INIT_STRING
 from .piece_manager import DownloadingFSM, PieceManager
 from .peer_connection import PeerConnection
 
+LOCK = threading.Lock()
 
 class TorrentClient:
     def __init__(self, ip, port, torrent_file=None, magnet_link=None, download_dir=None, uploader_info: dict = None, cli=False):
@@ -106,7 +107,7 @@ class TorrentClient:
     # ----------------- Server socket -----------------
     def listen_for_peers(self):
         """Listen for incoming peer connections and handle each new peer in a separate thread."""
-        self.log(f"Client is listening on {self.ip}, {self.port}")
+        self.log(f"Client is listening on {self.ip}, {self.port}\n")
         while True:
             sock, addr = self.server_socket.accept()
             threading.Thread(target=self.handle_peer_connection, args=(
@@ -120,7 +121,7 @@ class TorrentClient:
             'ip': ip,
             'port': port
         }
-        self.log(f"New connection from {addr}")
+        self.log(f"New connection from {addr}\n")
         try:
             connection = PeerConnection(self.info_hash, self.peer_id, sock,
                                         target_peer, self.piece_manager, outgoing=False, client=self)
@@ -128,7 +129,7 @@ class TorrentClient:
             self.piece_manager.add_peer(target_peer['id'])
             self.log(f"Successfully add connection to peer {target_peer['ip']}, {target_peer['port']}\n")
         except Exception as e:
-            self.log(f"Error handling connection from {addr}: {e}")
+            self.log(f"Error handling connection from {addr}: {e}\n")
 
     # -------------------- Connect --------------------
     # -------------------------------------------------
@@ -139,7 +140,7 @@ class TorrentClient:
             threading.Thread(target=self.connect_to_peer, args=(target_peer,)).start()
 
     def connect_to_peer(self, target_peer: dict):
-        self.log(f"Connecting to peer {target_peer['ip']}, {target_peer['port']}")
+        self.log(f"Connecting to peer {target_peer['ip']}, {target_peer['port']}\n")
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             sock.connect((target_peer['ip'], target_peer['port']))
@@ -149,7 +150,7 @@ class TorrentClient:
             self.log(f"Successfully connect to peer {target_peer['ip']}, {target_peer['port']}\n")
             self.connected_to_peers = True
         except Exception as e:
-            self.log(f"Failed to connect to peer {target_peer['ip']}, {target_peer['port']}: {e}")
+            self.log(f"Failed to connect to peer {target_peer['ip']}, {target_peer['port']}: {e}\n")
 
     def remove_connection(self, id):
         # self.peer_connections.pop(id)
@@ -186,12 +187,12 @@ class TorrentClient:
     # -------------------------------------------------
 
     def log(self, string):
+        LOCK.acquire()
         self.send_to_console += string
+        LOCK.release()
 
     def get_console_output(self):
-        sent_string = self.send_to_console
-        self.send_to_console = ""
-        return sent_string
+        return self.send_to_console
 
     def is_metadata_complete(self):
         return self.piece_manager.is_metadata_complete()
@@ -277,7 +278,7 @@ class TorrentClient:
                     port = self.peer_connections[peer].port
                     self.log(f"Requesting block {args} to peer {ip}, {port} ...\n")
 
-        self.log(f"\n{'-'*40}\n{'\t\tDownload complete!!\n'*3}\n{'-'*40}\n{'-'*40}")
+        self.log(f"\n{'-'*40}\n{'\t\tDownload complete!!\n'*3}\n{'-'*40}\n{'-'*40}\n")
         self.status = 'completed'
         self.downloading = False
         self.piece_manager.merge_all_pieces(self.download_dir)
