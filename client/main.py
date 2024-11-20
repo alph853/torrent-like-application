@@ -13,6 +13,7 @@ from qt_material import apply_stylesheet
 
 TORRENT_CLIENT_LIST: list[TorrentClient] = []
 GLOBAL_ID = 0
+PREVIOUS_ID = 0
 
 
 def get_ip_and_port():
@@ -92,7 +93,7 @@ class MainWindow(QMainWindow):
         TORRENT_CLIENT_LIST.append(client)
 
         while True:
-            continue
+            time.sleep(1000)
 
     def create_torrent(self):
         self.start_torrent_client(CreateTorrentDialog)
@@ -130,8 +131,16 @@ class MainWindow(QMainWindow):
 
     def on_table_row_clicked(self, index: QModelIndex):
         global GLOBAL_ID
+        global PREVIOUS_ID
+        PREVIOUS_ID = GLOBAL_ID
         GLOBAL_ID = index.row()
         self.files_model.removeRows(0, self.files_model.rowCount())
+
+        if GLOBAL_ID < len(TORRENT_CLIENT_LIST):
+            client = TORRENT_CLIENT_LIST[GLOBAL_ID]
+            # Get the files information for the selected torrent
+            progress_list = client.get_progress()
+            self.update_download_progress(progress_list)
 
     def limit_column_width(self, logicalIndex, oldSize, newSize):
         total_width = sum(self.tableView.horizontalHeader().sectionSize(i)
@@ -169,7 +178,7 @@ class MainWindow(QMainWindow):
                 time.sleep(1)
                 continue
 
-            if self.current_tab_idx != self.previous_tab_idx:
+            if self.current_tab_idx != self.previous_tab_idx or PREVIOUS_ID != GLOBAL_ID:
                 client = TORRENT_CLIENT_LIST[GLOBAL_ID]
                 if active_thread:
                     active_thread.join()
@@ -177,7 +186,7 @@ class MainWindow(QMainWindow):
                     target=self.display_thread_functions[self.current_tab_idx], daemon=True, args=(client, ))
                 active_thread.start()
                 self.previous_tab_idx = self.current_tab_idx
-            time.sleep(1)
+            time.sleep(0.2)
 
     def display_loading_screen(self):
         if not self.loading_screen:
@@ -213,6 +222,7 @@ class MainWindow(QMainWindow):
 
     def update_download_progress(self, progress_list: list):
         """Update the download progress."""
+        self.files_model.removeRows(0, self.files_model.rowCount())
         for file_info in progress_list:
             found = False
             for row in range(self.files_model.rowCount()):

@@ -156,7 +156,7 @@ class CreateTorrentDialog(QDialog):
         file_selection_layout = QVBoxLayout()
         self.file_path = QLineEdit()
         self.file_path.setPlaceholderText("Select Directory")
-        self.file_path.setText('D:/HK241/Database/Lecture-20240903T015208Z-001/Lecture')
+        self.file_path.setText('D:/STUDY/Semester241/MMT/slide')
         self.file_path.setStyleSheet("color: white;")
         file_buttons_layout = QHBoxLayout()
         select_file_button = QPushButton("Select file")
@@ -264,7 +264,7 @@ QPushButton:pressed {
 
         self.save_torrent_path = QLineEdit()
         self.save_torrent_path.setPlaceholderText("Select Directory")
-        self.save_torrent_path.setText('C:/Users/DELL/Documents')
+        self.save_torrent_path.setText('D:/STUDY/Semester241/MMT')
         self.save_torrent_path.setStyleSheet("color: white;")
 
         file_buttons_layout = QHBoxLayout()
