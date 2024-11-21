@@ -33,6 +33,7 @@ class TorrentClient:
         self.uploaded = 0
         self.download_dir = download_dir
         self.send_to_console = INIT_STRING
+        self.full_string_log = INIT_STRING
         # ---------------- Process inputs -----------------
 
         if magnet_link:
@@ -189,7 +190,14 @@ class TorrentClient:
     def log(self, string):
         LOCK.acquire()
         self.send_to_console += string
+        self.full_string_log += string
         LOCK.release()
+
+    def get_full_string_console(self):
+        LOCK.acquire()
+        self.send_to_console = ""
+        LOCK.release()
+        return self.full_string_log
 
     def get_console_output(self):
         LOCK.acquire()

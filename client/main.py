@@ -73,6 +73,7 @@ class MainWindow(QMainWindow):
         self.display_functions = [self.display_console, self.display_peers, self.display_download_progress]
         self.previous_torrent_list = []
         self.previous_id_progress = -1
+        self.previous_id_console = -1
         self.previous_download_progress = []
 
     def start_torrent_client(self, dialog_class):
@@ -159,9 +160,13 @@ class MainWindow(QMainWindow):
             self.update_torrent_progress(torrent_list)
 
     def display_console(self, client):
-        text = client.get_console_output()
-        if text:
-            self.label_general.append(text)
+        if self.previous_id_console != GLOBAL_ID:
+            self.label_general.setText(client.get_full_string_console())
+        else:
+            text = client.get_console_output()
+            if text:
+                self.label_general.append(text)
+        self.previous_id_console = GLOBAL_ID
 
     def display_peers(self, client):
         peers = client.get_peers()
