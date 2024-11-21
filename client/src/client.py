@@ -192,7 +192,11 @@ class TorrentClient:
         LOCK.release()
 
     def get_console_output(self):
-        return self.send_to_console
+        LOCK.acquire()
+        string = self.send_to_console
+        self.send_to_console = ""
+        LOCK.release()
+        return string
 
     def is_metadata_complete(self):
         return self.piece_manager.is_metadata_complete()

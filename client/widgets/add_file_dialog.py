@@ -264,7 +264,7 @@ QPushButton:pressed {
 
         self.save_torrent_path = QLineEdit()
         self.save_torrent_path.setPlaceholderText("Select Directory")
-        self.save_torrent_path.setText('D:/STUDY/Semester241/MMT')
+        self.save_torrent_path.setText('D:/STUDY/Semester241/MMT/ASM_MMT/asm1/test/down')
         self.save_torrent_path.setStyleSheet("color: white;")
 
         file_buttons_layout = QHBoxLayout()

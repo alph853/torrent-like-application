@@ -192,7 +192,6 @@ class PieceManager:
 
             self.state = DownloadingFSM.PIECE_FIND
             data = {k: v for (k, v) in self.piece_counter.items() if v > 0}
-            print("data", data)
             idx = min(data, key=data.get)
             peers = [id for (id, bitfield) in self.peer_bitfields.items() if bitfield[idx] == 1]
         return idx, peers
