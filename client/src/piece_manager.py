@@ -78,7 +78,6 @@ class PieceManager:
         self.block_request_complete = None
 
     def is_done_downloading(self):
-        # self.print_self_info()
         return self.state in (DownloadingFSM.DOWN_DONE, DownloadingFSM.SEEDING)
 
     def is_seeding(self):
@@ -192,7 +191,9 @@ class PieceManager:
 
             self.state = DownloadingFSM.PIECE_FIND
             data = {k: v for (k, v) in self.piece_counter.items() if v > 0}
-            idx = min(data, key=data.get)
+            min_count = min(data.values())
+            idx_list = [k for k, v in data.items() if v == min_count]
+            idx = random.choice(idx_list)
             peers = [id for (id, bitfield) in self.peer_bitfields.items() if bitfield[idx] == 1]
         return idx, peers
 
@@ -367,7 +368,9 @@ class PieceManager:
             'state': self.state,
             'piece_counter': self.piece_counter,
             'number_of_pieces': self.number_of_pieces,
-            'peer_bitfields': self.peer_bitfields
+            'peer_bitfields': self.peer_bitfields,
+            'file_manager': self.file_manager,
+            'piece2file_map': self.piece2file_map,
         }, indent=2, default=bytes_serializer))
 
 

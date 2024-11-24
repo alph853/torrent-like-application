@@ -15,7 +15,31 @@ TORRENT_CLIENT_LIST: list[TorrentClient] = []
 GLOBAL_ID = 0
 
 
+def display_size_in_bytes(size: int) -> str:
+    if size < 1024:
+        return f"{size} B"
+    elif size < 1024**2:
+        return f"{size/1024:.2f} KiB"
+    elif size < 1024**3:
+        return f"{size/1024**2:.2f} MiB"
+    elif size < 1024**4:
+        return f"{size/1024**3:.2f} GB"
+    else:
+        return f"{size/1024**4:.2f} TB"
+
+
 def get_ip_and_port():
+    # def get_public_ip():
+    #     try:
+    #         # Use a public API to fetch your public IP address
+    #         response = requests.get('https://api.ipify.org/?format=json')
+    #         response.raise_for_status()  # Raise an exception for HTTP errors
+    #         data = response.json()
+    #         return data['ip']
+    #     except requests.RequestException as e:
+    #         print(f"Error fetching public IP: {e}")
+    #         return None
+
     hostname = socket.gethostname()
     ip = socket.gethostbyname(hostname)
 
@@ -23,10 +47,11 @@ def get_ip_and_port():
         sock.bind((ip, 0))
         port = sock.getsockname()[1]
 
-    return {
+    addr = {
         'ip': ip,
         'port': port
     }
+    return addr
 
 
 class MainWindow(QMainWindow):
@@ -181,14 +206,14 @@ class MainWindow(QMainWindow):
             for file_info in progress_list:
                 self.files_model.appendRow([
                     QStandardItem(file_info['filename']),
-                    QStandardItem(f"{file_info['totalsize']} B"),
-                    QStandardItem(f"{file_info['remaining']} B"),
+                    QStandardItem(display_size_in_bytes(file_info['totalsize'])),
+                    QStandardItem(display_size_in_bytes(file_info['remaining'])),
                     QStandardItem(str(int(round(file_info['progress'], 2)*100)))  # Progress as string
                 ])
         else:
             for row, (file_info, previous_info) in enumerate(zip(progress_list, self.previous_download_progress)):
                 if previous_info != file_info:
-                    self.files_model.setItem(row, 2, QStandardItem(f"{file_info['remaining']} B"))
+                    self.files_model.setItem(row, 2, QStandardItem(display_size_in_bytes(file_info['remaining'])))
                     self.files_model.setItem(row, 3, QStandardItem(
                         str(int(round(file_info['progress'], 2)*100))))  # Progress as string
         self.previous_download_progress = progress_list
@@ -202,22 +227,25 @@ class MainWindow(QMainWindow):
             for row, file_info, previous_info in zip(range(self.torrent_model.rowCount()), torrent_list, self.previous_torrent_list):
                 if previous_info != file_info:
                     self.torrent_model.setItem(row, 2, QStandardItem(f"{file_info['status']}"))
-                    self.torrent_model.setItem(row, 5, QStandardItem(f"{file_info['upspeed']} B/s"))
-                    self.torrent_model.setItem(row, 6, QStandardItem(f"{file_info['downspeed']} B/s"))
+                    self.torrent_model.setItem(row, 3, QStandardItem(f"{file_info['seeds']}"))
+                    self.torrent_model.setItem(row, 4, QStandardItem(f"{file_info['peers']}"))
+                    self.torrent_model.setItem(row, 5, QStandardItem(
+                        f"{display_size_in_bytes(file_info['upspeed'])}/s"))
+                    self.torrent_model.setItem(row, 6, QStandardItem(
+                        f"{display_size_in_bytes(file_info['downspeed'])}/s"))
                     self.torrent_model.setItem(row, 1, QStandardItem(
-                        # Progress as string
-                        str(int(round((file_info['downloaded'])/(file_info['downloaded']+file_info['left']), 2)*100))))
+                        str(int(round((file_info['downloaded'])/(file_info['downloaded']+file_info['left']), 2)*100)) + '%'))
         else:
             for file_info in torrent_list[len(self.previous_torrent_list):]:
                 self.torrent_model.appendRow([
                     QStandardItem(file_info['name']),
                     QStandardItem(str(int(round((file_info['downloaded']) /
-                                                (file_info['downloaded']+file_info['left']), 2)*100))),
+                                                (file_info['downloaded']+file_info['left']), 2)*100)) + '%'),
                     QStandardItem(file_info['status']),
                     QStandardItem(f"{file_info['seeds']}"),
                     QStandardItem(f"{file_info['peers']}"),
-                    QStandardItem(f"{file_info['upspeed']}"),
-                    QStandardItem(f"{file_info['downspeed']}"),
+                    QStandardItem(f"{display_size_in_bytes(file_info['upspeed'])}/s"),
+                    QStandardItem(f"{display_size_in_bytes(file_info['downspeed'])}/s")
                 ])
         self.previous_torrent_list = torrent_list
 

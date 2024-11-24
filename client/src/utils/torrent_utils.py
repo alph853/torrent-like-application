@@ -135,6 +135,7 @@ class TorrentUtilsClass:
                     pieces += file_content
         else:
             files = [generate_file_dictionary(file_path, file_path)]
+            pieces = open(file_path, 'rb').read()
 
         pieces_dict = dict(enumerate(pieces[i:i+piece_size] for i in range(0, len(pieces), piece_size)))
         pieces_hash = b''.join([hashlib.sha1(pieces_dict[k]).digest() for k in sorted(pieces_dict.keys())])

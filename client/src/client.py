@@ -49,7 +49,7 @@ class TorrentClient:
         # ----------------- Server socket -----------------
 
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.bind((self.ip, self.port))
+        self.server_socket.bind(("0.0.0.0", self.port))
         self.server_socket.listen(5)
 
         threading.Thread(target=self.listen_for_peers, daemon=True).start()
@@ -219,8 +219,8 @@ class TorrentClient:
         return [(c.ip, c.port) for c in self.peer_connections.values()]
 
     def get_self_torrent_info(self):
-        seeds = len(self.piece_manager.not_interest_peers)
-        peers = len(self.peer_connections)
+        seeds = len(self.piece_manager.not_interest_peers) + 1 if not self.downloading else 0
+        peers = len(self.peer_connections) + 1
         return {
             'name': self.piece_manager.metadata['name'],
             'status': self.status,
