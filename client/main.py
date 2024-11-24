@@ -29,16 +29,16 @@ def display_size_in_bytes(size: int) -> str:
 
 
 def get_ip_and_port():
-    # def get_public_ip():
-    #     try:
-    #         # Use a public API to fetch your public IP address
-    #         response = requests.get('https://api.ipify.org/?format=json')
-    #         response.raise_for_status()  # Raise an exception for HTTP errors
-    #         data = response.json()
-    #         return data['ip']
-    #     except requests.RequestException as e:
-    #         print(f"Error fetching public IP: {e}")
-    #         return None
+    def get_public_ip():
+        try:
+            # Use a public API to fetch your public IP address
+            response = requests.get('https://api.ipify.org/?format=json')
+            response.raise_for_status()  # Raise an exception for HTTP errors
+            data = response.json()
+            return data['ip']
+        except requests.RequestException as e:
+            print(f"Error fetching public IP: {e}")
+            return None
 
     hostname = socket.gethostname()
     ip = socket.gethostbyname(hostname)
@@ -48,7 +48,7 @@ def get_ip_and_port():
         port = sock.getsockname()[1]
 
     addr = {
-        'ip': ip,
+        'ip': get_public_ip(),
         'port': port
     }
     return addr
