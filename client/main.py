@@ -9,6 +9,8 @@ from widgets.add_file_dialog import *
 from src import TorrentClient
 import threading
 from qt_material import apply_stylesheet
+import miniupnpc
+
 
 
 TORRENT_CLIENT_LIST: list[TorrentClient] = []
@@ -29,15 +31,32 @@ def display_size_in_bytes(size: int) -> str:
 
 
 def get_ip_and_port():
-    def get_public_ip():
+    # def get_public_ip():
+    #     try:
+    #         # Use a public API to fetch your public IP address
+    #         response = requests.get('https://api.ipify.org/?format=json')
+    #         response.raise_for_status()  # Raise an exception for HTTP errors
+    #         data = response.json()
+    #         return data['ip']
+    #     except requests.RequestException as e:
+    #         print(f"Error fetching public IP: {e}")
+    #         return None
+
+    def setup_upnp(port):
         try:
-            # Use a public API to fetch your public IP address
-            response = requests.get('https://api.ipify.org/?format=json')
-            response.raise_for_status()  # Raise an exception for HTTP errors
-            data = response.json()
-            return data['ip']
-        except requests.RequestException as e:
-            print(f"Error fetching public IP: {e}")
+            # Initialize the UPnP client
+            upnp = miniupnpc.UPnP()
+            upnp.discoverdelay = 200
+            upnp.discover()  # Discover devices
+            upnp.selectigd()  # Select the Internet Gateway Device (router)
+
+            # Add a port mapping
+            external_ip = upnp.externalipaddress()
+            upnp.addportmapping(port, 'TCP', upnp.lanaddr, port, 'BitTorrent', '')
+            print(f"Port {port} is mapped. External IP: {external_ip}")
+            return external_ip
+        except Exception as e:
+            print(f"Error setting up UPnP: {e}")
             return None
 
     hostname = socket.gethostname()
@@ -48,7 +67,7 @@ def get_ip_and_port():
         port = sock.getsockname()[1]
 
     addr = {
-        'ip': get_public_ip(),
+        'ip': setup_upnp(port),
         'port': port
     }
     return addr

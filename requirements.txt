@@ -1,5 +1,6 @@
 bencodepy
 fastapi[standard]
 pyqt6
-pyqt5designer
+miniupnpc
 requests
+pyqt5designer

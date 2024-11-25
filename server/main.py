@@ -38,7 +38,6 @@ async def announce(
         torrent = Torrent(info_hash=info_hash)
         TORRENT_DATABASE.add_torrent(torrent)
 
-    print('\n\nIP:', ip, type(ip))
     peer = Peer(
         peer_id=peer_id,
         ip=ip,

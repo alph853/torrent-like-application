@@ -144,6 +144,7 @@ class TorrentClient:
         self.log(f"Connecting to peer {target_peer['ip']}, {target_peer['port']}\n")
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
+            print('Trying to connect to', target_peer['ip'], target_peer['port'])
             sock.connect((target_peer['ip'], target_peer['port']))
             connection = PeerConnection(self.info_hash, self.peer_id, sock,
                                         target_peer, self.piece_manager, outgoing=True, client=self)
