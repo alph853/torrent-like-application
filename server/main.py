@@ -23,6 +23,7 @@ async def read_root():
 
 @app.get("/announce")
 async def announce(
+    request: Request,
     info_hash: str,
     ip: str,
     port: int,
@@ -40,7 +41,7 @@ async def announce(
 
     peer = Peer(
         peer_id=peer_id,
-        ip=ip,
+        ip=request.client.host,
         port=port,
         uploaded=uploaded,
         downloaded=downloaded,
@@ -78,6 +79,7 @@ async def announce(
     return Response(content=response, media_type="application/octet-stream")
 
 
+
 @app.get("/peers")
 async def get_peers(info_hash: str):
     """Return a list of peers for a given torrent."""
@@ -90,10 +92,3 @@ async def get_torrents():
     """Return a list of all torrents."""
     torrents = TORRENT_DATABASE.get_torrent()
     return JSONResponse(content=torrents)
-
-
-@app.get("/peers")
-async def get_peers(info_hash: str):
-    """Return a list of peers for a given torrent."""
-    peers = TORRENT_DATABASE.get_torrent_peers(info_hash)
-    return JSONResponse(content=peers)

@@ -9,69 +9,10 @@ from widgets.add_file_dialog import *
 from src import TorrentClient
 import threading
 from qt_material import apply_stylesheet
-import miniupnpc
-
 
 
 TORRENT_CLIENT_LIST: list[TorrentClient] = []
 GLOBAL_ID = 0
-
-
-def display_size_in_bytes(size: int) -> str:
-    if size < 1024:
-        return f"{size} B"
-    elif size < 1024**2:
-        return f"{size/1024:.2f} KiB"
-    elif size < 1024**3:
-        return f"{size/1024**2:.2f} MiB"
-    elif size < 1024**4:
-        return f"{size/1024**3:.2f} GB"
-    else:
-        return f"{size/1024**4:.2f} TB"
-
-
-def get_ip_and_port():
-    # def get_public_ip():
-    #     try:
-    #         # Use a public API to fetch your public IP address
-    #         response = requests.get('https://api.ipify.org/?format=json')
-    #         response.raise_for_status()  # Raise an exception for HTTP errors
-    #         data = response.json()
-    #         return data['ip']
-    #     except requests.RequestException as e:
-    #         print(f"Error fetching public IP: {e}")
-    #         return None
-
-    def setup_upnp(port):
-        try:
-            # Initialize the UPnP client
-            upnp = miniupnpc.UPnP()
-            upnp.discoverdelay = 200
-            upnp.discover()  # Discover devices
-            upnp.selectigd()  # Select the Internet Gateway Device (router)
-
-            # Add a port mapping
-            external_ip = upnp.externalipaddress()
-            upnp.addportmapping(port, 'TCP', upnp.lanaddr, port, 'BitTorrent', '')
-            print(f"Port {port} is mapped. External IP: {external_ip}")
-            return external_ip
-        except Exception as e:
-            print(f"Error setting up UPnP: {e}")
-            return None
-
-    hostname = socket.gethostname()
-    ip = socket.gethostbyname(hostname)
-
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind((ip, 0))
-        port = sock.getsockname()[1]
-
-    addr = {
-        'ip': setup_upnp(port),
-        'port': port
-    }
-    return addr
-
 
 class MainWindow(QMainWindow):
     update_download_torrent_signal = pyqtSignal(list)
@@ -125,7 +66,7 @@ class MainWindow(QMainWindow):
 
         if dialog.exec() == QDialog.DialogCode.Accepted:
             threading.Thread(target=self.init_client, daemon=True, kwargs=(
-                {**get_ip_and_port(), **dialog.get_result()})).start()
+                {**self.get_ip_and_port(), **dialog.get_result()})).start()
 
     def init_client(self, **kwargs):
         client = TorrentClient(**kwargs)
@@ -225,14 +166,14 @@ class MainWindow(QMainWindow):
             for file_info in progress_list:
                 self.files_model.appendRow([
                     QStandardItem(file_info['filename']),
-                    QStandardItem(display_size_in_bytes(file_info['totalsize'])),
-                    QStandardItem(display_size_in_bytes(file_info['remaining'])),
+                    QStandardItem(self.display_size_in_bytes(file_info['totalsize'])),
+                    QStandardItem(self.display_size_in_bytes(file_info['remaining'])),
                     QStandardItem(str(int(round(file_info['progress'], 2)*100)))  # Progress as string
                 ])
         else:
             for row, (file_info, previous_info) in enumerate(zip(progress_list, self.previous_download_progress)):
                 if previous_info != file_info:
-                    self.files_model.setItem(row, 2, QStandardItem(display_size_in_bytes(file_info['remaining'])))
+                    self.files_model.setItem(row, 2, QStandardItem(self.display_size_in_bytes(file_info['remaining'])))
                     self.files_model.setItem(row, 3, QStandardItem(
                         str(int(round(file_info['progress'], 2)*100))))  # Progress as string
         self.previous_download_progress = progress_list
@@ -249,9 +190,9 @@ class MainWindow(QMainWindow):
                     self.torrent_model.setItem(row, 3, QStandardItem(f"{file_info['seeds']}"))
                     self.torrent_model.setItem(row, 4, QStandardItem(f"{file_info['peers']}"))
                     self.torrent_model.setItem(row, 5, QStandardItem(
-                        f"{display_size_in_bytes(file_info['upspeed'])}/s"))
+                        f"{self.display_size_in_bytes(file_info['upspeed'])}/s"))
                     self.torrent_model.setItem(row, 6, QStandardItem(
-                        f"{display_size_in_bytes(file_info['downspeed'])}/s"))
+                        f"{self.display_size_in_bytes(file_info['downspeed'])}/s"))
                     self.torrent_model.setItem(row, 1, QStandardItem(
                         str(int(round((file_info['downloaded'])/(file_info['downloaded']+file_info['left']), 2)*100)) + '%'))
         else:
@@ -263,8 +204,8 @@ class MainWindow(QMainWindow):
                     QStandardItem(file_info['status']),
                     QStandardItem(f"{file_info['seeds']}"),
                     QStandardItem(f"{file_info['peers']}"),
-                    QStandardItem(f"{display_size_in_bytes(file_info['upspeed'])}/s"),
-                    QStandardItem(f"{display_size_in_bytes(file_info['downspeed'])}/s")
+                    QStandardItem(f"{self.display_size_in_bytes(file_info['upspeed'])}/s"),
+                    QStandardItem(f"{self.display_size_in_bytes(file_info['downspeed'])}/s")
                 ])
         self.previous_torrent_list = torrent_list
 
@@ -277,6 +218,34 @@ class MainWindow(QMainWindow):
     def hide_loading_screen(self):
         if self.loading_screen:
             self.loading_screen.hide()
+
+    @staticmethod
+    def display_size_in_bytes(size: int) -> str:
+        if size < 1024:
+            return f"{size} B"
+        elif size < 1024**2:
+            return f"{size/1024:.2f} KiB"
+        elif size < 1024**3:
+            return f"{size/1024**2:.2f} MiB"
+        elif size < 1024**4:
+            return f"{size/1024**3:.2f} GB"
+        else:
+            return f"{size/1024**4:.2f} TB"
+
+    @staticmethod
+    def get_ip_and_port():
+        hostname = socket.gethostname()
+        ip = socket.gethostbyname(hostname)
+
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.bind((ip, 0))
+            port = sock.getsockname()[1]
+
+        addr = {
+            'ip': ip,
+            'port': port
+        }
+        return addr
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

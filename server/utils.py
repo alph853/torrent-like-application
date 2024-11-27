@@ -1,24 +1,34 @@
 import hashlib
 import os
+import socket
 import struct
 from database import Database, Torrent, Peer
 from typing import List, Dict, Tuple
 
 
-def to_compact(peer_list: List[Peer]):
+def to_compact(peer_list: List[Peer]) -> bytes:
+    """
+    Convert a list of Peer objects with IPv6 addresses to a compact binary format.
+    Each peer is represented by 16 bytes for the IPv6 address and 2 bytes for the port.
+    """
     if not peer_list:
         return b''
 
-    compact_str = b''
+    compact_bytes = b''
     for peer in peer_list:
-        # Convert each IP segment to an integer and pack it as bytes
-        ip_bytes = bytes(int(octet) for octet in peer.ip.split('.'))
+        try:
+            # Convert IPv6 address to 16-byte binary format
+            ip_bytes = socket.inet_pton(socket.AF_INET6, peer.ip)
+        except socket.error as e:
+            print(f"Invalid IPv6 address '{peer.ip}': {e}")
+            continue  # Skip invalid IP addresses
+
+        # Convert port to 2-byte big-endian format
         port_bytes = peer.port.to_bytes(2, byteorder='big')
 
-        # Concatenate IP and port bytes for each peer
-        compact_str += ip_bytes + port_bytes
-
-    return compact_str
+        # Concatenate IP and port bytes
+        compact_bytes += ip_bytes + port_bytes
+    return compact_bytes
 
 # --------- FOR TESTING ------------
 def generate_peer_id(ip=None, port=None) -> str:

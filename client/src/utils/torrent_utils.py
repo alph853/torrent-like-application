@@ -1,5 +1,6 @@
 import hashlib
 import os
+import socket
 import struct
 import bencodepy
 
@@ -65,22 +66,37 @@ class TorrentUtilsClass:
 
         return info_hash, tracker_url, display_name, metadata
 
-    def parse_compacted_peer_list(self, peer_compacted_string) -> list[dict]:
-        """Parse a compacted peer list and return a list of dictionaries containing the peer 'id', 'ip', 'port'.
-
-        'id' is generated using the peer's IP and port.
-        """
+    def parse_compacted_peer_list(self, peer_compacted_string: bytes) -> list:
         peer_list = []
-        for i in range(0, len(peer_compacted_string), 6):
-            ip = peer_compacted_string[i:i+4]
-            port = peer_compacted_string[i+4:i+6]
+        peer_size = 18  # 16 bytes IPv6 + 2 bytes port
+        if len(peer_compacted_string) % peer_size != 0:
+            print("Warning: Compacted peer string length is not a multiple of 18 bytes.")
+
+        for i in range(0, len(peer_compacted_string), peer_size):
+            peer_data = peer_compacted_string[i:i+peer_size]
+            if len(peer_data) < peer_size:
+                print(f"Skipping incomplete peer data: {peer_data}")
+                continue  # Skip incomplete data
+
+            ip_bytes = peer_data[:16]
+            port_bytes = peer_data[16:]
+
+            try:
+                ip_str = socket.inet_ntop(socket.AF_INET6, ip_bytes)
+            except socket.error as e:
+                print(f"Error converting IP bytes to string: {e}")
+                continue  # Skip invalid IPs
+
+            port = int.from_bytes(port_bytes, byteorder='big')
+            peer_id = self.generate_peer_id(ip_str, port)
 
             peer_dict = {
-                'id': self.generate_peer_id(ip, port),
-                'ip': '.'.join(map(str, ip)),
-                'port': struct.unpack('!H', port)[0]
+                'id': peer_id,
+                'ip': ip_str,
+                'port': port
             }
             peer_list.append(peer_dict)
+
         return peer_list
 
     @staticmethod

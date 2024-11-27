@@ -370,5 +370,4 @@ class PeerConnection:
 
     def seeding(self):
         """Terminate the connection and stop the send threads."""
-        self.out_thread.join()
         self.send_not_interested_message()

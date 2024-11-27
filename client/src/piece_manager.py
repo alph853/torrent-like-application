@@ -318,6 +318,9 @@ class PieceManager:
         all_pieces = [self.pieces[i] for i in sorted(self.pieces.keys())]
         all_pieces = b''.join(all_pieces)
 
+        dir = os.path.join(dir, self.metadata['name'])
+        os.makedirs(dir, exist_ok=True)
+
         global_len = 0
         for file in self.metadata['files']:
             file_path = os.path.join(dir, *file['path'])

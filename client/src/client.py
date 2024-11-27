@@ -12,15 +12,8 @@ from .peer_connection import PeerConnection
 LOCK = threading.Lock()
 
 class TorrentClient:
-    def __init__(self, ip, port, torrent_file=None, magnet_link=None, download_dir=None, uploader_info: dict = None, cli=False):
-        """
-        Example:
-            uploader_info = {
-                'save_torrent_dir': string,
-                'tracker_url': bytes,
-                'upload dir': string,
-            }
-        """
+    def __init__(self, ip, port, torrent_file=None, magnet_link=None,
+                 download_dir=None, uploader_info: dict = None, cli=False):
         self.running = True
         self.ip = ip
         self.port = port
@@ -48,8 +41,8 @@ class TorrentClient:
 
         # ----------------- Server socket -----------------
 
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.bind(("0.0.0.0", self.port))
+        self.server_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+        self.server_socket.bind(("", self.port))
         self.server_socket.listen(5)
 
         threading.Thread(target=self.listen_for_peers, daemon=True).start()
@@ -116,7 +109,7 @@ class TorrentClient:
 
     def handle_peer_connection(self, sock, addr):
         """Handle communication with a newly connected peer."""
-        ip, port = addr
+        ip, port, _, _ = addr
         target_peer = {
             'id': TorrentUtils.generate_peer_id(ip, port),
             'ip': ip,
@@ -142,7 +135,7 @@ class TorrentClient:
 
     def connect_to_peer(self, target_peer: dict):
         self.log(f"Connecting to peer {target_peer['ip']}, {target_peer['port']}\n")
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         try:
             print('Trying to connect to', target_peer['ip'], target_peer['port'])
             sock.connect((target_peer['ip'], target_peer['port']))
@@ -176,7 +169,6 @@ class TorrentClient:
         }
         response = requests.get(self.tracker_url, params=params).content
         response = bencodepy.decode(response)
-
         peers = response[b'peers']
         self.interval = response[b'interval']
         self.peer_list = TorrentUtils.parse_compacted_peer_list(peers)
@@ -220,7 +212,9 @@ class TorrentClient:
         return [(c.ip, c.port) for c in self.peer_connections.values()]
 
     def get_self_torrent_info(self):
-        seeds = len(self.piece_manager.not_interest_peers) + 1 if not self.downloading else 0
+        seeds = len(self.piece_manager.not_interest_peers)
+        if not self.downloading:
+            seeds += 1
         peers = len(self.peer_connections) + 1
         return {
             'name': self.piece_manager.metadata['name'],

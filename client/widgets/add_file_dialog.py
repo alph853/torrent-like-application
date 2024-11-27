@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import *
 from PyQt6.QtCore import Qt
 import requests
 from PyQt6.QtGui import QPalette, QColor
+from .config import *
 
 
 class AddFileDialogMagnet(QDialog):
@@ -22,6 +23,7 @@ class AddFileDialogMagnet(QDialog):
 
         self.save_dir = QLineEdit()
         self.save_dir.setPlaceholderText("Select Directory")
+        self.save_dir.setText(SAVE_DIR_MAGNET)
 
         save_dir_layout = QHBoxLayout()
         browse_button_2 = QPushButton("Browse")
@@ -84,6 +86,7 @@ class AddFileDialogTorrent(QDialog):
 
             self.save_dir = QLineEdit()
             self.save_dir.setPlaceholderText("Select Directory")
+            self.save_dir.setText(SAVE_DIR_TORRENT)
 
             save_dir_layout = QHBoxLayout()
             browse_button_2 = QPushButton("Browse")
@@ -95,7 +98,7 @@ class AddFileDialogTorrent(QDialog):
             button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
                                           QDialogButtonBox.StandardButton.Cancel)
             button_box.accepted.connect(self.accept)
-            button_box.rejected.connect(self.reject)
+            # button_box.rejected.connect(self.reject)
 
             main_layout.addWidget(QLabel("Chosen file:"))
             main_layout.addLayout(browse_layout)
@@ -256,7 +259,7 @@ QPushButton:pressed {
         fields_layout = QFormLayout()
 
         self.tracker_urls = QTextEdit()
-        self.tracker_urls.setText('https://10diembtl.ngrok.app/announce')
+        self.tracker_urls.setText(TRACKER_URL)
         fields_layout.addRow("Tracker URLs:", self.tracker_urls)
 
         save_torrent_dir_layout = QHBoxLayout()
@@ -264,7 +267,7 @@ QPushButton:pressed {
 
         self.save_torrent_path = QLineEdit()
         self.save_torrent_path.setPlaceholderText("Select Directory")
-        self.save_torrent_path.setText('D:/STUDY/Semester241/MMT/ASM_MMT/asm1/test/down')
+        self.save_torrent_path.setText(SAVE_DIR)
         self.save_torrent_path.setStyleSheet("color: white;")
 
         file_buttons_layout = QHBoxLayout()
