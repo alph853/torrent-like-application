@@ -42,7 +42,7 @@ class TorrentClient:
         # ----------------- Server socket -----------------
 
         self.server_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-        self.server_socket.bind(("", self.port))
+        self.server_socket.bind(("::", self.port))
         self.server_socket.listen(5)
 
         threading.Thread(target=self.listen_for_peers, daemon=True).start()
