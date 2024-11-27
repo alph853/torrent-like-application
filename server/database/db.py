@@ -34,11 +34,12 @@ class Torrent:
         self.info_hash = info_hash  # SHA-1 hash of the torrent's info section
         self.seeders_id_list = []   # List of peer IDs that are seeders
         self.leechers_id_list = []  # List of peer IDs that are leechers
-        self.peer_list: List[Peer] = []  # List of all peers participating in this torrent
+        self.peer_list: List[Peer] = []  # List of all peers in the torrent
 
     def add_peer(self, peer: Peer):
         """Add a peer to the torrent, update seeder/leecher lists."""
         self.peer_list.append(peer)
+
         if peer.left == 0:
             self.seeders_id_list.append(peer.peer_id)
         else:

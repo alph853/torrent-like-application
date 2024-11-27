@@ -4,31 +4,57 @@ import socket
 import struct
 from database import Database, Torrent, Peer
 from typing import List, Dict, Tuple
+from pydantic import BaseModel
+import ipaddress
 
 
-def to_compact(peer_list: List[Peer]) -> bytes:
+def is_ipv4(ip: str) -> bool:
     """
-    Convert a list of Peer objects with IPv6 addresses to a compact binary format.
-    Each peer is represented by 16 bytes for the IPv6 address and 2 bytes for the port.
+    Determines if the given IP address is IPv4.
     """
-    if not peer_list:
-        return b''
+    try:
+        return isinstance(ipaddress.ip_address(ip), ipaddress.IPv4Address)
+    except ValueError:
+        return False
 
-    compact_bytes = b''
-    for peer in peer_list:
+
+def is_ipv6(ip: str) -> bool:
+    """
+    Determines if the given IP address is IPv6.
+    """
+    try:
+        return isinstance(ipaddress.ip_address(ip), ipaddress.IPv6Address)
+    except ValueError:
+        return False
+
+
+def to_compact(peer_list: List[Peer]) -> Tuple[bytes, bytes]:
+    """
+    Convert a list of PeerInfo objects to compact binary formats for IPv4 and IPv6.
+    """
+    def get_validated_bytes_ip(ip: str, family) -> bytes:
         try:
-            # Convert IPv6 address to 16-byte binary format
-            ip_bytes = socket.inet_pton(socket.AF_INET6, peer.ip)
+            return socket.inet_pton(family, ip)
         except socket.error as e:
-            print(f"Invalid IPv6 address '{peer.ip}': {e}")
-            continue  # Skip invalid IP addresses
+            print(f"Invalid IP address '{ip}': {e}")
+            return b''
 
-        # Convert port to 2-byte big-endian format
+    compact_ipv4 = b''
+    compact_ipv6 = b''
+
+    for peer in peer_list:
+        ip = peer.ip
         port_bytes = peer.port.to_bytes(2, byteorder='big')
 
-        # Concatenate IP and port bytes
-        compact_bytes += ip_bytes + port_bytes
-    return compact_bytes
+        if is_ipv4(ip):
+            compact_ipv4 += get_validated_bytes_ip(ip, socket.AF_INET) + port_bytes
+        elif is_ipv6(ip):
+            compact_ipv6 += get_validated_bytes_ip(ip, socket.AF_INET6) + port_bytes
+        else:
+            print(f"Invalid IP address format for peer '{peer.peer_id}': {ip}")
+
+    return compact_ipv4, compact_ipv6
+
 
 # --------- FOR TESTING ------------
 def generate_peer_id(ip=None, port=None) -> str:

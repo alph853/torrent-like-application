@@ -66,38 +66,80 @@ class TorrentUtilsClass:
 
         return info_hash, tracker_url, display_name, metadata
 
-    def parse_compacted_peer_list(self, peer_compacted_string: bytes) -> list:
-        peer_list = []
-        peer_size = 18  # 16 bytes IPv6 + 2 bytes port
-        if len(peer_compacted_string) % peer_size != 0:
-            print("Warning: Compacted peer string length is not a multiple of 18 bytes.")
+    # def parse_compacted_peer_list(self, compacted_peer: bytes, compacted_peer6: bytes) -> list:
+    #     peer_list = []
+    #     peer_size = 18  # 16 bytes IPv6 + 2 bytes port
+    #     if len(compacted_peer6) % peer_size != 0:
+    #         print("Warning: Compacted peer string length is not a multiple of 18 bytes.")
 
-        for i in range(0, len(peer_compacted_string), peer_size):
-            peer_data = peer_compacted_string[i:i+peer_size]
-            if len(peer_data) < peer_size:
-                print(f"Skipping incomplete peer data: {peer_data}")
-                continue  # Skip incomplete data
+    #     for i in range(0, len(compacted_peer6), peer_size):
+    #         peer_data = compacted_peer6[i:i+peer_size]
+    #         if len(peer_data) < peer_size:
+    #             print(f"Skipping incomplete peer data: {peer_data}")
+    #             continue  # Skip incomplete data
 
-            ip_bytes = peer_data[:16]
-            port_bytes = peer_data[16:]
+    #         ip_bytes = peer_data[:16]
+    #         port_bytes = peer_data[16:]
 
-            try:
-                ip_str = socket.inet_ntop(socket.AF_INET6, ip_bytes)
-            except socket.error as e:
-                print(f"Error converting IP bytes to string: {e}")
-                continue  # Skip invalid IPs
+    #         try:
+    #             ip_str = socket.inet_ntop(socket.AF_INET6, ip_bytes)
+    #         except socket.error as e:
+    #             print(f"Error converting IP bytes to string: {e}")
+    #             continue  # Skip invalid IPs
 
-            port = int.from_bytes(port_bytes, byteorder='big')
-            peer_id = self.generate_peer_id(ip_str, port)
+    #         port = int.from_bytes(port_bytes, byteorder='big')
+    #         peer_id = self.generate_peer_id(ip_str, port)
 
-            peer_dict = {
-                'id': peer_id,
-                'ip': ip_str,
-                'port': port
-            }
-            peer_list.append(peer_dict)
+    #         peer_dict = {
+    #             'id': peer_id,
+    #             'ip': ip_str,
+    #             'port': port
+    #         }
+    #         peer_list.append(peer_dict)
 
-        return peer_list
+    #     return peer_list
+
+    def parse_compacted_peer_list(self, compacted_peer: bytes, compacted_peer6: bytes):
+        """
+        Parses compacted peer lists for both IPv4 and IPv6 and returns two separate lists.
+        """
+        def parse_peers(compacted_peer, peer_size, family):
+            peers = []
+            if len(compacted_peer) % peer_size != 0:
+                print(f"Warning: Compacted peer string length is not a multiple of {peer_size} bytes.")
+
+            for i in range(0, len(compacted_peer), peer_size):
+                peer_data = compacted_peer[i:i+peer_size]
+                if len(peer_data) < peer_size:
+                    print(f"Skipping incomplete peer data: {peer_data}")
+                    continue  # Skip incomplete data
+
+                ip_bytes = peer_data[:peer_size - 2]
+                port_bytes = peer_data[peer_size - 2:]
+
+                try:
+                    ip_str = socket.inet_ntop(family, ip_bytes)
+                except socket.error as e:
+                    print(f"Error converting IP bytes to string: {e}")
+                    continue  # Skip invalid IPs
+
+                port = int.from_bytes(port_bytes, byteorder='big')
+                peer_id = self.generate_peer_id(ip_str, port)
+
+                peer = {
+                    'id': peer_id,
+                    'ip': ip_str,
+                    'port': port
+                }
+                peers.append(peer)
+            return peers
+
+        IPV4_PEER_SIZE = 6
+        IPV6_PEER_SIZE = 18
+        ipv4_peers = parse_peers(compacted_peer, IPV4_PEER_SIZE, socket.AF_INET)
+        ipv6_peers = parse_peers(compacted_peer6, IPV6_PEER_SIZE, socket.AF_INET6)
+
+        return (ipv4_peers, ipv6_peers)
 
     @staticmethod
     def receive_and_validate_handshake(sock, info_hash):

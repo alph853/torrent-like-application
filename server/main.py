@@ -68,11 +68,12 @@ async def announce(
     peer_list = TORRENT_DATABASE.get_torrent_peers(info_hash)
     peer_list = [p for p in peer_list if p.peer_id != peer_id]
 
-    peers_response = to_compact(peer_list) if compact else peer_list
+    peers, peers6 = to_compact(peer_list) if compact else peer_list
 
     response = {
         b'interval': INTERVAL,
-        b'peers': peers_response
+        b'peers': peers,
+        b'peers6': peers6,
     }
 
     response = bencodepy.encode(response)

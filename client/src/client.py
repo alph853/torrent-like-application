@@ -12,6 +12,7 @@ from .peer_connection import PeerConnection
 LOCK = threading.Lock()
 
 class TorrentClient:
+
     def __init__(self, ip, port, torrent_file=None, magnet_link=None,
                  download_dir=None, uploader_info: dict = None, cli=False):
         self.running = True
@@ -40,18 +41,12 @@ class TorrentClient:
             self.init_uploader(params)
 
         # ----------------- Server socket -----------------
-
-        self.server_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-        self.server_socket.bind(("::", self.port))
-        self.server_socket.listen(5)
-
-        threading.Thread(target=self.listen_for_peers, daemon=True).start()
+        threading.Thread(target=self.listen_for_connections_ipv4, daemon=True).start()
+        threading.Thread(target=self.listen_for_connections_ipv6, daemon=True).start()
 
         # -------------------------------------------------
         # --------------- Start connections ---------------
-        self.interval = None
-        self.peer_list = None
-        self.send_tracker_request()
+        self.peer_list, self.peer6_list, self.interval = self.send_tracker_request()
 
         threading.Thread(target=self.send_tracker_request_periodic, daemon=True).start()
 
@@ -99,25 +94,54 @@ class TorrentClient:
 
     # -------------------------------------------------
     # ----------------- Server socket -----------------
-    def listen_for_peers(self):
-        """Listen for incoming peer connections and handle each new peer in a separate thread."""
-        self.log(f"Client is listening on {self.ip}, {self.port}\n")
-        while True:
-            sock, addr = self.server_socket.accept()
-            threading.Thread(target=self.handle_peer_connection, args=(
-                sock, addr), daemon=True).start()
 
-    def handle_peer_connection(self, sock, addr):
+    def listen_for_connections_ipv4(self):
+        """
+        Listens for incoming IPv4 connections and handles them.
+        """
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server_socket.bind(('', self.port))  # Bind to all IPv4 interfaces
+        server_socket.listen()
+
+        while True:
+            try:
+                conn, addr = server_socket.accept()
+                ip, port = addr
+                threading.Thread(target=self.handle_peer_connection, args=(conn, ip, port), daemon=True).start()
+            except Exception as e:
+                self.log(f"Error accepting IPv4 connection: {e}\n")
+
+    def listen_for_connections_ipv6(self):
+        """
+        Listens for incoming IPv6 connections and handles them.
+        """
+        server_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # On some systems, you may need to set IPV6_V6ONLY to 1 to restrict to IPv6
+        # server_socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+        server_socket.bind(('', self.port))  # Bind to all IPv6 interfaces
+        server_socket.listen()
+
+        while True:
+            try:
+                conn, addr = server_socket.accept()
+                ip, port, _, _ = addr
+                threading.Thread(target=self.handle_peer_connection, args=(conn, ip, port), daemon=True).start()
+            except Exception as e:
+                self.log(f"Error accepting IPv6 connection: {e}\n")
+
+    def handle_peer_connection(self, conn, ip, port):
         """Handle communication with a newly connected peer."""
-        ip, port, _, _ = addr
         target_peer = {
             'id': TorrentUtils.generate_peer_id(ip, port),
             'ip': ip,
             'port': port
         }
+        addr = f"{ip} : {port}"
         self.log(f"New connection from {addr}\n")
         try:
-            connection = PeerConnection(self.info_hash, self.peer_id, sock,
+            connection = PeerConnection(self.info_hash, self.peer_id, conn,
                                         target_peer, self.piece_manager, outgoing=False, client=self)
             self.peer_connections[target_peer['id']] = connection
             self.piece_manager.add_peer(target_peer['id'])
@@ -131,21 +155,24 @@ class TorrentClient:
     def init_connections(self):
         """Initiate connections to all peers in the peer list."""
         for target_peer in self.peer_list:
-            threading.Thread(target=self.connect_to_peer, args=(target_peer,)).start()
+            threading.Thread(target=self.connect_to_peer, args=(target_peer, socket.AF_INET)).start()
+        for target_peer in self.peer6_list:
+            threading.Thread(target=self.connect_to_peer, args=(target_peer, socket.AF_INET6)).start()
 
-    def connect_to_peer(self, target_peer: dict):
+    def connect_to_peer(self, target_peer: dict, family):
         self.log(f"Connecting to peer {target_peer['ip']}, {target_peer['port']}\n")
-        sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+        sock = socket.socket(family, socket.SOCK_STREAM)
+        addr = (target_peer['ip'], target_peer['port'])
         try:
-            print('Trying to connect to', target_peer['ip'], target_peer['port'])
-            sock.connect((target_peer['ip'], target_peer['port']))
+            print(addr)
+            sock.connect(addr)
             connection = PeerConnection(self.info_hash, self.peer_id, sock,
                                         target_peer, self.piece_manager, outgoing=True, client=self)
             self.peer_connections[target_peer['id']] = connection
-            self.log(f"Successfully connect to peer {target_peer['ip']}, {target_peer['port']}\n")
+            self.log(f"Successfully connect to peer {addr}\n")
             self.connected_to_peers = True
         except Exception as e:
-            self.log(f"Failed to connect to peer {target_peer['ip']}, {target_peer['port']}: {e}\n")
+            self.log(f"Failed to connect to peer {addr}: {e}\n")
 
     def remove_connection(self, id):
         # self.peer_connections.pop(id)
@@ -170,8 +197,10 @@ class TorrentClient:
         response = requests.get(self.tracker_url, params=params).content
         response = bencodepy.decode(response)
         peers = response[b'peers']
-        self.interval = response[b'interval']
-        self.peer_list = TorrentUtils.parse_compacted_peer_list(peers)
+        peers6 = response[b'peers6']
+        interval = response[b'interval']
+        peer_list, peer6_list = TorrentUtils.parse_compacted_peer_list(peers, peers6)
+        return peer_list, peer6_list, interval
 
     def send_tracker_request_periodic(self):
         # Send a request to the tracker, initialize peer_list and interval
