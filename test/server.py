@@ -1,106 +1,82 @@
-# server.py
+import asyncio
+import json
+from aiohttp import web, WSMsgType
+import aiohttp_cors
 
-from fastapi import FastAPI, Request, HTTPException, status
-from pydantic import BaseModel, Field
-from typing import List, Dict
-import uvicorn
-import logging
-import ipaddress
-import socket
-import struct
-
-app = FastAPI()
-
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-# In-memory storage for peers
-peers: Dict[str, Dict] = {}
+# In-memory storage for connected peers
+peers = {}
 
 
-class PeerRegister(BaseModel):
-    peer_id: str = Field(..., description="Unique identifier for the peer")
-    port: int = Field(..., ge=1, le=65535, description="Port number the peer is listening on")
+async def http_announce(request):
+    params = request.rel_url.query
+    peer_id = params.get('peer_id')
+    port = params.get('port')
+    if not peer_id or not port:
+        return web.Response(text="Missing peer_id or port", status=400)
 
+    # For simplicity, store peer info
+    peers[peer_id] = {'ip': request.remote, 'port': port}
 
-class PeerInfo(BaseModel):
-    peer_id: str
-    ip: str
-    port: int
-
-
-@app.post("/register", status_code=status.HTTP_201_CREATED)
-async def register_peer(request: Request, peer: PeerRegister):
-    """
-    Register a new peer with the tracker.
-    """
-    # Extract the client's IP address, considering proxy headers
-    x_forwarded_for = request.headers.get('X-Forwarded-For')
-    if x_forwarded_for:
-        # X-Forwarded-For may contain multiple IPs, the first is the original client
-        client_ip = x_forwarded_for.split(",")[0].strip()
-    else:
-        client_ip = request.client.host
-
-    logging.info(f"Registering peer: ID={peer.peer_id}, IP={client_ip}, Port={peer.port}")
-
-    # Validate IP version
-    try:
-        ip_obj = ipaddress.ip_address(client_ip)
-    except ValueError:
-        logging.error(f"Invalid IP address received: {client_ip}")
-        raise HTTPException(status_code=400, detail="Invalid IP address.")
-
-    # Store the peer's information
-    peers[peer.peer_id] = {
-        "peer_id": peer.peer_id,
-        "ip": client_ip,
-        "port": peer.port
-    }
-
-    logging.info(f"Current number of registered peers: {len(peers)}")
-
-    return {"status": "registered", "peer_id": peer.peer_id}
-
-
-@app.get("/peers", response_model=List[PeerInfo])
-async def get_peers(peer_id: str):
-    """
-    Retrieve a list of all registered peers excluding the requesting peer.
-    """
-    if peer_id not in peers:
-        logging.warning(f"Peer ID {peer_id} not found when requesting peers.")
-        raise HTTPException(status_code=404, detail="Peer not registered.")
-
-    # Exclude the requesting peer from the list
+    # Respond with list of other peers
     other_peers = [
-        PeerInfo(peer_id=peer["peer_id"], ip=peer["ip"], port=peer["port"])
-        for pid, peer in peers.items() if pid != peer_id
+        {'peer_id': pid, 'ip': info['ip'], 'port': info['port']}
+        for pid, info in peers.items() if pid != peer_id
     ]
-
-    logging.info(f"Peer {peer_id} requested list of peers. Returning {len(other_peers)} peers.")
-
-    return other_peers
+    return web.json_response({'peers': other_peers})
 
 
-@app.delete("/remove/{peer_id}", status_code=status.HTTP_200_OK)
-async def remove_peer(peer_id: str):
-    """
-    Remove a peer from the tracker.
-    """
-    if peer_id in peers:
-        del peers[peer_id]
-        logging.info(f"Removed peer with ID: {peer_id}")
-        return {"status": "removed", "peer_id": peer_id}
+async def websocket_handler(request):
+    ws = web.WebSocketResponse()
+    await ws.prepare(request)
+
+    # Expect the first message to be the peer_id
+    msg = await ws.receive()
+    if msg.type == WSMsgType.TEXT:
+        data = json.loads(msg.data)
+        peer_id = data.get('peer_id')
+        if not peer_id:
+            await ws.close()
+            return ws
+        peers[peer_id] = {'ws': ws}
+        print(f"Peer {peer_id} connected via WebSocket")
     else:
-        logging.warning(f"Attempted to remove non-existent peer ID: {peer_id}")
-        raise HTTPException(status_code=404, detail="Peer not found")
+        await ws.close()
+        return ws
 
+    try:
+        async for msg in ws:
+            if msg.type == WSMsgType.TEXT:
+                data = json.loads(msg.data)
+                target_id = data.get('target_id')
+                message = data.get('message')
+                if target_id in peers and 'ws' in peers[target_id]:
+                    await peers[target_id]['ws'].send_json({
+                        'from': peer_id,
+                        'message': message
+                    })
+            elif msg.type == WSMsgType.ERROR:
+                print(f'WebSocket connection closed with exception {ws.exception()}')
+    finally:
+        del peers[peer_id]
+        print(f"Peer {peer_id} disconnected")
 
-@app.get("/")
-async def read_root():
-    return {"message": "Hello, World!"}
+    return ws
 
-if __name__ == "__main__":
-    # Run the app with Uvicorn
-    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
+app = web.Application()
+app.router.add_get('/announce', http_announce)
+app.router.add_get('/ws', websocket_handler)
+
+# Enable CORS if needed
+cors = aiohttp_cors.setup(app, defaults={
+    "*": aiohttp_cors.ResourceOptions(
+        allow_credentials=True,
+        expose_headers="*",
+        allow_headers="*",
+    )
+})
+
+for route in list(app.router.routes()):
+    cors.add(route)
+
+if __name__ == '__main__':
+    web.run_app(app, port=8000)

@@ -5,6 +5,8 @@ from PyQt6.QtGui import QIcon, QFont, QStandardItem, QStandardItemModel
 from PyQt6.QtCore import Qt, pyqtSignal, QModelIndex, QTimer
 from PyQt6.uic import loadUi
 import sys
+
+import stun
 from widgets.add_file_dialog import *
 from src import TorrentClient
 import threading
@@ -245,7 +247,14 @@ class MainWindow(QMainWindow):
             'ip': ip,
             'port': port
         }
+
         return addr
+
+        # nat_type, external_ip, external_port = stun.get_ip_info(stun_host="stun.l.google.com", stun_port=19302)
+        # return {
+        #     'ip': external_ip,
+        #     'port': external_port
+        # }
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

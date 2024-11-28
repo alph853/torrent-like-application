@@ -119,7 +119,7 @@ class TorrentClient:
         server_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         # On some systems, you may need to set IPV6_V6ONLY to 1 to restrict to IPv6
-        # server_socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+        server_socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
         server_socket.bind(('', self.port))  # Bind to all IPv6 interfaces
         server_socket.listen()
 
