@@ -52,6 +52,7 @@ class PeerConnection:
             # Receive and validate the peer's handshake request
             self.extension_supported, self.peer_id = TorrentUtils.receive_and_validate_handshake(self.sock, info_hash)
             self.send_bitfield_message()
+            self.send_not_interested_message()
 
         # Send the handshake message. Both outgoing and incoming connections send the same message
         reserved_bytes = MagnetUtils.get_reserved_bytes(self.extension_supported)

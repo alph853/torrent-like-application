@@ -3,6 +3,7 @@ import bencodepy
 from fastapi import FastAPI, Query, Request, Response
 from typing import List, Dict
 from fastapi.responses import JSONResponse
+import uvicorn
 
 from database import Database, Torrent, Peer
 from utils import to_compact
@@ -41,7 +42,7 @@ async def announce(
 
     peer = Peer(
         peer_id=peer_id,
-        ip=ip,
+        ip=request.client.host,
         port=port,
         uploaded=uploaded,
         downloaded=downloaded,

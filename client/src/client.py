@@ -96,12 +96,11 @@ class TorrentClient:
     # ----------------- Server socket -----------------
 
     def listen_for_connections_ipv4(self):
-        """
-        Listens for incoming IPv4 connections and handles them.
+        """Listens for incoming IPv4 connections and handles them.
         """
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server_socket.bind(('', self.port))  # Bind to all IPv4 interfaces
+        server_socket.bind(('', self.port))
         server_socket.listen()
 
         while True:
@@ -113,14 +112,12 @@ class TorrentClient:
                 self.log(f"Error accepting IPv4 connection: {e}\n")
 
     def listen_for_connections_ipv6(self):
-        """
-        Listens for incoming IPv6 connections and handles them.
+        """Listens for incoming IPv6 connections and handles them.
         """
         server_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        # On some systems, you may need to set IPV6_V6ONLY to 1 to restrict to IPv6
         server_socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
-        server_socket.bind(('', self.port))  # Bind to all IPv6 interfaces
+        server_socket.bind(('', self.port))
         server_socket.listen()
 
         while True:
@@ -164,7 +161,6 @@ class TorrentClient:
         sock = socket.socket(family, socket.SOCK_STREAM)
         addr = (target_peer['ip'], target_peer['port'])
         try:
-            print(addr)
             sock.connect(addr)
             connection = PeerConnection(self.info_hash, self.peer_id, sock,
                                         target_peer, self.piece_manager, outgoing=True, client=self)
