@@ -196,14 +196,24 @@ class MainWindow(QMainWindow):
                         f"{self.display_size_in_bytes(file_info['upspeed'])}/s"))
                     self.torrent_model.setItem(row, 6, QStandardItem(
                         f"{self.display_size_in_bytes(file_info['downspeed'])}/s"))
-                    self.torrent_model.setItem(row, 1, QStandardItem(
-                        str(int(round((file_info['downloaded'])/(file_info['downloaded']+file_info['left']), 2)*100)) + '%'))
+
+                    try:
+                        progress = str(
+                            int(round(file_info['downloaded']/(file_info['downloaded']+file_info['left']), 2)*100)) + '%'
+                    except ZeroDivisionError:
+                        progress = '0%'
+                    self.torrent_model.setItem(row, 1, QStandardItem(progress))
         else:
             for file_info in torrent_list[len(self.previous_torrent_list):]:
+                try:
+                    progress = str(
+                        int(round(file_info['downloaded']/(file_info['downloaded']+file_info['left']), 2)*100)) + '%'
+                except ZeroDivisionError:
+                    progress = '0%'
+
                 self.torrent_model.appendRow([
                     QStandardItem(file_info['name']),
-                    QStandardItem(str(int(round((file_info['downloaded']) /
-                                                (file_info['downloaded']+file_info['left']), 2)*100)) + '%'),
+                    QStandardItem(progress),
                     QStandardItem(file_info['status']),
                     QStandardItem(f"{file_info['seeds']}"),
                     QStandardItem(f"{file_info['peers']}"),
@@ -256,12 +266,6 @@ class MainWindow(QMainWindow):
             'port': port
         }
         return addr
-
-        # nat_type, external_ip, external_port = stun.get_ip_info(stun_host="stun.l.google.com", stun_port=19302)
-        # return {
-        #     'ip': external_ip,
-        #     'port': external_port
-        # }
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

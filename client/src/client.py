@@ -281,7 +281,7 @@ class TorrentClient:
 
             # (2) Waitng for piece response
             if self.piece_manager.is_waiting_for_piece_response():
-                time.sleep(0.5)
+                time.sleep(0.05)
                 continue
 
             # (3) Check if a piece is downloaded
@@ -302,7 +302,7 @@ class TorrentClient:
                 for id in peers:
                     self.peer_connections[id].send_interest_message()
 
-                time.sleep(0.25)  # Wait for peers to respond
+                time.sleep(0.05)  # Wait for peers to respond
 
                 unchoked_peers = self.piece_manager.get_unchoked_peers()
                 if not unchoked_peers:
