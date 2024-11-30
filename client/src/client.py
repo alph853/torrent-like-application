@@ -10,6 +10,7 @@ from .piece_manager import DownloadingFSM, PieceManager
 from .peer_connection import PeerConnection
 
 LOCK = threading.Lock()
+REQ_LOCK = threading.Lock()
 
 class TorrentClient:
 
@@ -28,6 +29,7 @@ class TorrentClient:
         self.download_dir = download_dir
         self.send_to_console = INIT_STRING
         self.full_string_log = INIT_STRING
+        self.init_done = False
         # ---------------- Process inputs -----------------
 
         if magnet_link:
@@ -41,6 +43,7 @@ class TorrentClient:
             self.init_uploader(params)
 
         # ----------------- Server socket -----------------
+        self.log(f"Client listening on {self.ip}:{self.port} ...\n\n")
         threading.Thread(target=self.listen_for_connections_ipv4, daemon=True).start()
         threading.Thread(target=self.listen_for_connections_ipv6, daemon=True).start()
 
@@ -61,10 +64,12 @@ class TorrentClient:
 
         self.connected_to_peers = False
         self.init_connections()
+        self.init_done = True
+
 
         if not uploader_info:
             while not self.connected_to_peers:
-                time.sleep(0.5)
+                time.sleep(0.2)
             threading.Thread(target=self.start_downloading, daemon=True).start()
         else:
             threading.Thread(target=self.start_uploading_only, daemon=True).start()
@@ -206,26 +211,23 @@ class TorrentClient:
     # -------------------------------------------------
 
     def log(self, string):
-        LOCK.acquire()
-        self.send_to_console += string
-        self.full_string_log += string
-        LOCK.release()
+        with LOCK:
+            self.send_to_console += string
+            self.full_string_log += string
 
     def get_full_string_console(self):
-        LOCK.acquire()
-        self.send_to_console = ""
-        LOCK.release()
+        with LOCK:
+            self.send_to_console = ""
         return self.full_string_log
 
     def get_console_output(self):
-        LOCK.acquire()
-        string = self.send_to_console
-        self.send_to_console = ""
-        LOCK.release()
+        with LOCK:
+            string = self.send_to_console
+            self.send_to_console = ""
         return string
 
     def is_metadata_complete(self):
-        return self.piece_manager.is_metadata_complete()
+        return self.piece_manager.state == DownloadingFSM.META_DOWN
 
     def get_progress(self) -> list[dict[str, int]]:
         """Get the progress of the download in percentage."""
@@ -258,7 +260,7 @@ class TorrentClient:
         self.status = 'paused'
         self.piece_manager.pause()
 
-    def cont(self):
+    def resume(self):
         self.status = self.prev_status
 
     # -------------------------------------------------
@@ -268,67 +270,79 @@ class TorrentClient:
         """Start downloading pieces. If metdata is not fully downloaded yet, the thread will be in busy waiting.
         Tthis thread will not handle metadata download.
         """
-        while not self.is_metadata_complete():
-            self.log("Waiting for metadata...\n")
-            time.sleep(2)
+        while self.piece_manager.state == DownloadingFSM.META_DOWN:
+            self.log("\nWaiting for metadata...\n")
+            time.sleep(0.2)
 
-        self.log("\nMetadata downloaded!\n\n")
+        if self.piece_manager.state == DownloadingFSM.META_DONE:
+            self.piece_manager.metadata_merge_and_init_piece_down()
+            self.piece_manager.state = DownloadingFSM.PIECE_FIND
+            self.log("\nMetadata downloaded!\n\n")
 
-        success_get_unchoked_peers = False
-        while not self.piece_manager.is_done_downloading():
-            if self.status == 'paused':
-                continue
-
-            # (2) Waitng for piece response
-            if self.piece_manager.is_waiting_for_piece_response():
-                time.sleep(0.05)
-                continue
-
-            # (3) Check if a piece is downloaded
-            piece = self.piece_manager.is_piece_request_done()
-            if piece is not None:
-                self.log(f"\nPiece {piece} downloaded!\n")
-                for connection in self.peer_connections.values():
-                    connection.send_have_message(piece)
-                success_get_unchoked_peers = False
-                continue
-
+        while True:
             # (1) Initiate a new piece (if begin or no piece is being downloaded or no unchoked peer)
-            if not success_get_unchoked_peers:
+            if self.piece_manager.state == DownloadingFSM.PIECE_FIND:
                 piece_idx, peers = self.piece_manager.find_next_rarest_piece()
-                if piece_idx is None:       # If no piece is found, all pieces are downloaded
-                    self.log(f'\nn{'-'*40}\nAll pieces has been downloaded!\n{"-"*40}\n')
-                    break
+                if piece_idx is None:       # All pieces downloaded
+                    self.piece_manager.state = DownloadingFSM.SEEDING
+                    continue
+                elif piece_idx == -1:       # No pieces available
+                    self.log("\nNo pieces available...\n")
+                    time.sleep(0.2)
+                    continue
+
                 for id in peers:
                     self.peer_connections[id].send_interest_message()
 
-                time.sleep(0.05)  # Wait for peers to respond
-
                 unchoked_peers = self.piece_manager.get_unchoked_peers()
-                if not unchoked_peers:
+                get_unchoked_timeout = 0
+                while not unchoked_peers:
                     self.log("Trying to get unchoked peers...\n")
-                    time.sleep(1)
+                    time.sleep(0.2)
+                    unchoked_peers = self.piece_manager.get_unchoked_peers()
+                    get_unchoked_timeout += 0.2
+                    if get_unchoked_timeout > 2:
+                        break
+                if get_unchoked_timeout > 2:
                     continue
-                success_get_unchoked_peers = True
 
                 # Divide piece into blocks and request from peers
+                self.piece_manager.state = DownloadingFSM.PIECE_REQ
                 block_requests = TorrentUtils.divide_piece_into_blocks(
                     piece_idx, self.piece_manager.piece_size, self.piece_manager.block_size)
-                self.piece_manager.add_requesting_blocks(piece_idx, block_requests)
+                self.piece_manager.add_block_request(piece_idx, block_requests)
                 self.log(f"\nREQUESTING PIECE {piece_idx} ...\n\n")
                 # Distribute blocks among unchoked peers
-                for i, args in enumerate(block_requests):
-                    peer = unchoked_peers[i % len(unchoked_peers)]
-                    self.peer_connections[peer].send_request_message(*args)
-                    ip = self.peer_connections[peer].ip
-                    port = self.peer_connections[peer].port
-                    self.log(f"Requesting block {args} to peer {ip}, {port} ...\n")
 
-        self.log(f"\n{'-'*40}\n{'\t\tDownload complete!!\n'*3}\n{'-'*40}\n{'-'*40}\n")
-        self.status = 'completed'
-        self.downloading = False
-        self.piece_manager.merge_all_pieces(self.download_dir)
-        threading.Thread(target=self.start_uploading_only, daemon=True).start()
+                with REQ_LOCK:
+                    for i, args in enumerate(block_requests):
+                        peer = unchoked_peers[i % len(unchoked_peers)]
+                        self.peer_connections[peer].send_request_message(*args)
+                        ip, port = self.peer_connections[peer].ip, self.peer_connections[peer].port
+                        self.log(f"Requesting block {args} to peer {ip}, {port} ...\n")
+
+            # (2) Waitng for piece response
+            elif self.piece_manager.state == DownloadingFSM.PIECE_REQ:
+                if self.piece_manager.is_gathered_all_blocks():
+                    self.piece_manager.merge_blocks_to_piece()
+                    self.piece_manager.state = DownloadingFSM.PIECE_FIND
+
+                    piece = self.piece_manager.requesting_piece
+                    self.log(f'\n\nPIECE {piece} DOWNLOADED!\nSending "Have" message to all peers...\n\n')
+                    for connection in self.peer_connections.values():
+                        connection.send_have_message(piece)
+                else:
+                    time.sleep(0.2)
+
+            elif self.piece_manager.state == DownloadingFSM.SEEDING:
+                self.log(f'\n\n{'-'*40}\nDOWNLOAD COMPLETED!\nSTART SEEDING\n{"-"*40}\n')
+                self.piece_manager.state = DownloadingFSM.SEEDING
+                self.status = 'completed'
+                self.downloading = False
+                self.piece_manager.merge_all_pieces(self.download_dir)
+                self.start_uploading_only()
+                return
+
 
     def start_uploading_only(self):
         """Start seeding the torrent."""
@@ -336,13 +350,5 @@ class TorrentClient:
             connection.seeding()
 
     def periodic_update_console(self):
-        threading.Thread(target=self.print_progress_periodically, daemon=True).start()
         while True:
             print(self.get_console_output(), end="")
-
-    def print_progress_periodically(self):
-        while True:
-            # progress = self.get_progress()
-            # if progress:
-            #     print(json.dumps(progress, indent=2))
-            time.sleep(10)

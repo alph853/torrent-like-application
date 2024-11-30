@@ -33,12 +33,7 @@ class PeerConnection:
         self.init_connection(info_hash, my_id, outgoing)
 
     def init_connection(self, info_hash, my_id, outgoing):
-        try:
-            self.send_handshake_message(info_hash, my_id, outgoing)
-        except Exception as e:
-            print(f"Error during handshake connection: {e}")
-            self.queue_running = False
-            self.client.remove_connection(self.id)
+        self.send_handshake_message(info_hash, my_id, outgoing)
 
         self.in_thread = threading.Thread(target=self.process_recv_messages, daemon=True)
         self.in_thread.start()
@@ -52,7 +47,8 @@ class PeerConnection:
             # Receive and validate the peer's handshake request
             self.extension_supported, self.peer_id = TorrentUtils.receive_and_validate_handshake(self.sock, info_hash)
             self.send_bitfield_message()
-            self.send_not_interested_message()
+            if self.piece_manager.is_seeding():
+                self.seeding()
 
         # Send the handshake message. Both outgoing and incoming connections send the same message
         reserved_bytes = MagnetUtils.get_reserved_bytes(self.extension_supported)
@@ -68,7 +64,6 @@ class PeerConnection:
             # Receive and validate the peer's handshake response
             self.extension_supported, self.peer_id = TorrentUtils.receive_and_validate_handshake(self.sock, info_hash)
             if self.extension_supported:
-                # Send extension handshake
                 self.send_extension_handshake()
 
     def recv_message(self):
@@ -274,43 +269,28 @@ class PeerConnection:
     def handle_bitfield_message(self, message):
         """Handle a bitfield message from the peer."""
         bitfield = message[5:]
-        parsed_bitfield = []
-
-        for byte in bitfield:
-            for bit_position in range(8):
-                parsed_bitfield.append((byte >> (7 - bit_position)) & 1)
-        parsed_bitfield = parsed_bitfield[:self.piece_manager.number_of_pieces]
-        self.client.log(f"Receive bitfield from peer {self.ip}, {
-                                 self.port}: {parsed_bitfield}\n")
-        self.piece_manager.add_peer_bitfield(self.id, parsed_bitfield)
+        self.piece_manager.add_peer_bitfield(self.id, bitfield, self.ip, self.port)
 
     def send_choke_message(self):
-        """Send a choke message to the peer."""
         message = struct.pack(">IB", 1+4, MessageType.CHOKE.value)
         self.enqueue_send_message(message)
 
     def handle_choke_message(self):
-        """Handle a choke message from the peer."""
         self.client.log(f"Peer {self.ip}, {self.port} choked.\n")
 
     def send_unchoke_message(self):
-        """Send an unchoke message to the peer."""
         message = struct.pack(">IB", 1+4, MessageType.UNCHOKE.value)
         self.enqueue_send_message(message)
 
     def handle_unchoke_message(self):
-        """Handle an unchoke message from the peer."""
         self.piece_manager.add_unchoked_peer(self.id)
         self.client.log(f"Peer {self.ip}, {self.port} unchoked.\n")
 
-
     def send_request_message(self, piece_index, begin, length):
-        """Send a request message to the peer."""
         message = struct.pack(">IBIII", 17, MessageType.REQUEST.value, piece_index, begin, length)
         self.enqueue_send_message(message)
 
     def handle_request_message(self, message):
-        """Handle a request message from the peer."""
         if self.peer_not_interest:
             return
         else:
@@ -321,54 +301,44 @@ class PeerConnection:
                                  self.port}: {index}, {begin}, {length}\n")
 
     def send_have_message(self, piece_index):
-        """Send a have message to the peer."""
         message = struct.pack(">IBI", 9, MessageType.HAVE.value, piece_index)
         self.enqueue_send_message(message)
 
     def handle_have_message(self, message):
-        """Handle a have message from the peer."""
         piece_index = struct.unpack(">I", message[5:])[0]
         self.piece_manager.add_peer_piece(self.id, piece_index)
         self.client.log(f"\nPeer {self.ip}, {self.port} has piece {piece_index}\n")
 
     def send_piece_message(self, piece_index, begin, block):
-        """Send a piece message to the peer."""
         message = struct.pack(">IBII", len(block) + 13, MessageType.PIECE.value, piece_index, begin) + block
         self.enqueue_send_message(message)
 
     def handle_piece_message(self, message):
-        """Handle a piece message from the peer."""
         _, begin = struct.unpack(">II", message[5:13])
         block = message[13:]
         self.piece_manager.add_block(self.id, begin, block)
         self.client.log(f"Receive a block from peer ({self.ip}, {self.port})\n")
 
     def send_interest_message(self):
-        """Send an interested to the peer for a specific piece."""
         message = struct.pack(">IB", 5, MessageType.INTERESTED.value)
         self.enqueue_send_message(message)
 
     def handle_interest_message(self):
-        """Handle an interested message from the peer."""
         if self.id in self.piece_manager.select_peers_for_unchoking():
             self.send_unchoke_message()
         else:
             self.send_choke_message()
 
     def send_not_interested_message(self):
-        """Send a not interested message to the peer."""
         message = struct.pack(">IB", 5, MessageType.NOT_INTERESTED.value)
         self.enqueue_send_message(message)
 
     def handle_not_interested_message(self):
-        """Handle a not interested message from the peer."""
         self.peer_not_interest = True
         self.piece_manager.add_not_interest_peers(self.id)
 
     def enqueue_send_message(self, message):
-        """Enqueue a message to be sent to the peer."""
         self.out_queue.put(message)
 
     def seeding(self):
-        """Terminate the connection and stop the send threads."""
         self.send_not_interested_message()

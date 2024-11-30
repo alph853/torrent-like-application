@@ -10,14 +10,15 @@ import bencodepy
 
 from .utils import TorrentUtils, MagnetUtils
 
-lock = threading.Lock()
+PIECE_LOCK = threading.Lock()
+METADATA_LOCK = threading.Lock()
 
 
 class DownloadingFSM(enumerate):
-    META_DOWN, PIECE_FIND, PIECE_REQ, PIECE_REQ_DONE, DOWN_DONE, SEEDING = range(6)
+    META_DOWN, META_DONE, PIECE_FIND, PIECE_REQ, SEEDING = range(5)
 
 class PieceManager:
-    def __init__(self, peer_list, metadata: dict, pieces: dict, client, piece_size=512*1024, block_size=64*1024, num_unchoked=2):
+    def __init__(self, peer_list, metadata: dict, pieces: dict, client, piece_size=512*1024, block_size=64*1024, num_unchoked=4):
         self.piece_size = piece_size
         self.block_size = block_size
         self.metadata = metadata
@@ -48,9 +49,16 @@ class PieceManager:
 
         threading.Thread(target=self.calculating_speed, daemon=True).start()
 
+        self.requesting_blocks = dict()
+        self.requesting_piece = None
+        self.number_of_blocks = -1
+        self.block_request_complete = None
+
+
         if metadata:
-            self.metadata_pieces, self.metadata_size = self.split_metadata(metadata, piece_size)
+            self.metadata_pieces, self.metadata_size = self.split_metadata_for_sharing(metadata, piece_size)
             self.metadata_piece_count = self.metadata_size // piece_size + (1 if self.metadata_size % piece_size else 0)
+
             self.number_of_pieces = len(self.metadata['pieces'])//20
             self.piece_counter = {i: 0 for i in range(self.number_of_pieces)}
             if pieces:
@@ -64,35 +72,25 @@ class PieceManager:
             self.state = DownloadingFSM.META_DOWN
             self.needed_metadata_pieces = None
             self.metadata_ongoing_requests = None
-
             self.metadata_pieces = dict()
             self.metadata_size = None
             self.metadata_piece_count = None
+
             self.number_of_pieces = None
             self.piece_counter = dict()             # Counter of pieces that held by the client
             self.peer_bitfields = {peer['id']: [] for peer in peer_list}
 
-        self.requesting_blocks = dict()
-        self.requesting_piece = None
-        self.number_of_blocks = -1
-        self.block_request_complete = None
-
-    def is_done_downloading(self):
-        return self.state in (DownloadingFSM.DOWN_DONE, DownloadingFSM.SEEDING)
 
     def is_seeding(self):
         return self.state == DownloadingFSM.SEEDING
 
-    def split_metadata(self, metadata: dict, piece_size) -> tuple[dict, int]:
+    def split_metadata_for_sharing(self, metadata: dict, piece_size) -> tuple[dict, int]:
         metadata = bencodepy.encode(metadata)
         metadata_size = len(metadata)
         metadata_pieces = dict()
         for i in range(0, metadata_size, piece_size):
             metadata_pieces[i] = metadata[i:i + piece_size]
         return metadata_pieces, metadata_size
-
-    def is_metadata_complete(self):
-        return self.state != DownloadingFSM.META_DOWN
 
     def get_metadata_size(self):
         return self.metadata_size
@@ -112,7 +110,7 @@ class PieceManager:
 
     def get_next_metadata_piece(self) -> int | None:
         """Get the next metadata piece index to request from a peer. Return None means all pieces are downloaded."""
-        if self.is_metadata_complete():
+        if self.state != DownloadingFSM.META_DOWN:
             return None
 
         for piece_idx, piece_needed in enumerate(self.needed_metadata_pieces):
@@ -120,18 +118,14 @@ class PieceManager:
                 self.metadata_ongoing_requests[piece_idx] = True
                 return piece_idx
         piece = next((i for i, x in enumerate(self.needed_metadata_pieces) if x), None)
-
         if piece is None:
-            self.state = DownloadingFSM.PIECE_FIND
-            self.metadata_merge()
-            threading.Thread(target=self.calculating_top_uploaders, daemon=True).start()
-
+            self.state = DownloadingFSM.META_DONE
         return piece
 
     def get_metadata_piece(self, piece_index):
         return self.metadata_pieces.get(piece_index, None)
 
-    def metadata_merge(self):
+    def metadata_merge_and_init_piece_down(self):
         pieces = [self.metadata_pieces[idx] for idx in sorted(self.metadata_pieces.keys())]
         metadata = b''.join(pieces)
         self.metadata = bencodepy.decode(metadata)
@@ -143,29 +137,28 @@ class PieceManager:
                 self.peer_bitfields[peer] = [0] * self.number_of_pieces
         self.piece_counter = {i: self.piece_counter[i] for i in range(self.number_of_pieces)}
         self.init_file_manager()
+        threading.Thread(target=self.calculating_top_uploaders, daemon=True).start()
+
 
     # -------------------------------------------------
     # -------------------------------------------------
     # -------------------------------------------------
 
-    def get_bitfield(self) -> bytes:
-        """
-        Constructs the bitfield as a byte array, where each bit represents a piece.
-        A bit is 1 if the piece is available, otherwise 0.
+    def get_bitfield(self):
+        """Constructs the bitfield as a byte array, where each bit (0,1) represents a piece is absent/possessed.
         """
         if not self.pieces:
             return b""
 
-        with lock:
+        with PIECE_LOCK:
             # Initialize a byte array with enough bytes to represent all pieces
             bitfield = [0] * ((self.number_of_pieces + 7) // 8)  # One byte for every 8 pieces
 
             # Set the corresponding bit for each piece
             for piece_index in self.pieces.keys():
                 byte_index = piece_index // 8
-                bit_index = 7 - (piece_index % 8)  # Bits are ordered from most significant to least significant
+                bit_index = 7 - (piece_index % 8)
                 bitfield[byte_index] |= (1 << bit_index)
-
         return bytes(bitfield)
 
     def add_peer(self, id):
@@ -173,39 +166,48 @@ class PieceManager:
         self.peer_upload[id] = 0
         self.optimistic_unchoked_peer = id
 
-    def add_peer_bitfield(self, id, bitfield: list):
-        with lock:
-            self.peer_bitfields[id] = bitfield
+    def add_peer_bitfield(self, id, bitfield: bytes, ip, port):
+        parsed_bitfield = []
+        for byte in bitfield:
+            for bit_position in range(8):
+                parsed_bitfield.append((byte >> (7 - bit_position)) & 1)
+
+        parsed_bitfield = parsed_bitfield[:self.number_of_pieces]
+        self.peer_bitfields[id] = parsed_bitfield
+        self.client.log(f"Receive bitfield from peer {ip}, {port}: {parsed_bitfield}\n")
+
+        with PIECE_LOCK:
             if not self.piece_counter:
-                self.number_of_pieces = len(bitfield)
-                self.piece_counter = {i: bitfield[i] for i in range(self.number_of_pieces)}
+                self.number_of_pieces = len(parsed_bitfield)
+                self.piece_counter = {i: parsed_bitfield[i] for i in range(self.number_of_pieces)}
             else:
                 for i in self.piece_counter.keys():
-                    self.piece_counter[i] += bitfield[i]
+                    self.piece_counter[i] += parsed_bitfield[i]
 
     def find_next_rarest_piece(self) -> tuple[int, list]:
-        with lock:
+        """Return the next rarest piece. Return None if all pieces are downloaded, return -1 if no pieces are available."""
+        with PIECE_LOCK:
             if not self.piece_counter:
-                self.state = DownloadingFSM.DOWN_DONE
                 return None, []
 
-            self.state = DownloadingFSM.PIECE_FIND
             data = {k: v for (k, v) in self.piece_counter.items() if v > 0}
+            if not data:
+                return -1, []
             min_count = min(data.values())
             idx_list = [k for k, v in data.items() if v == min_count]
             idx = random.choice(idx_list)
             peers = [id for (id, bitfield) in self.peer_bitfields.items() if bitfield[idx] == 1]
         return idx, peers
 
-    def delete_piece(self, indexes: int):
-        with lock:
-            self.piece_counter.pop(indexes, None)
+    def delete_piece(self, indices: int):
+        with PIECE_LOCK:
+            self.piece_counter.pop(indices, None)
 
     def add_peer_piece(self, id, piece_index):
         if self.peer_bitfields[id]:
             self.peer_bitfields[id][piece_index] = 1
 
-        with lock:
+        with PIECE_LOCK:
             if self.piece_counter.get(piece_index) is not None:
                 self.piece_counter[piece_index] += 1
 
@@ -261,75 +263,63 @@ class PieceManager:
     # -------------------------------------------------
     # -------------------------------------------------
     def get_block(self, piece_idx, begin, length):
-        lock.acquire()
-        self.uploaded += length
-        lock.release()
+        with PIECE_LOCK:
+            self.uploaded += length
         return self.pieces[piece_idx][begin:begin + length]
 
-    def add_requesting_blocks(self, piece_idx, block_requests):
+    def add_block_request(self, piece_idx, block_requests):
         self.requesting_blocks = dict()
         self.requesting_piece = piece_idx
         self.number_of_blocks = len(block_requests)
-        self.state = DownloadingFSM.PIECE_REQ
 
     def add_block(self, id, start, block_data):
-        self.requesting_blocks[start] = block_data
         data_sz = len(block_data)
         self.peer_upload[id] = data_sz
         self.downloaded += data_sz
         self.left -= data_sz
+        self.requesting_blocks[start] = block_data
 
-        # If acquire all blocks
-        if len(self.requesting_blocks.keys()) == self.number_of_blocks:
-            self.state = DownloadingFSM.PIECE_REQ_DONE
-            self.unchoked_peers = []
-            piece_data = b''.join([self.requesting_blocks[i] for i in sorted(self.requesting_blocks.keys())])
-            self.pieces[self.requesting_piece] = piece_data
+    def is_gathered_all_blocks(self):
+        return len(self.requesting_blocks.keys()) == self.number_of_blocks
 
-            # update download progress
-            for file in self.piece2file_map[self.requesting_piece]:
-                length_in_file = file['length_in_file']
-                file_key = file['file']
-                file_length = self.file_manager[file_key]['length']
+    def merge_blocks_to_piece(self):
+        self.unchoked_peers = []
+        piece_data = b''.join([self.requesting_blocks[i] for i in sorted(self.requesting_blocks.keys())])
+        self.pieces[self.requesting_piece] = piece_data
 
-                if file_length != 0:
-                    add_percentage = length_in_file / file_length
-                else:
-                    add_percentage = 0
-                self.file_manager[file_key]['downloaded'] += add_percentage
-                self.file_manager[file_key]['remaining'] -= length_in_file
+        # update download progress
+        for file in self.piece2file_map[self.requesting_piece]:
+            length_in_file = file['length_in_file']
+            file_key = file['file']
+            file_length = self.file_manager[file_key]['length']
 
-            self.delete_piece(self.requesting_piece)
+            if file_length != 0:
+                add_percentage = length_in_file / file_length
+            else:
+                add_percentage = 0
+            self.file_manager[file_key]['downloaded'] += add_percentage
+            self.file_manager[file_key]['remaining'] -= length_in_file
 
-    def is_piece_request_done(self) -> int | None:
-        if self.state == DownloadingFSM.PIECE_REQ_DONE or self.requesting_piece is not None:
-            piece = self.requesting_piece
-            self.requesting_piece = None
-            return piece
-        return None
+        self.delete_piece(self.requesting_piece)
 
-    def is_waiting_for_piece_response(self):
-        return self.state == DownloadingFSM.PIECE_REQ
-
-    def merge_all_pieces(self, dir):
+    def merge_all_pieces(self, directory):
         if sorted(self.pieces.keys()) != list(range(self.number_of_pieces)):
             return None
 
         all_pieces = [self.pieces[i] for i in sorted(self.pieces.keys())]
         all_pieces = b''.join(all_pieces)
 
-        dir = os.path.join(dir, self.metadata['name'])
-        os.makedirs(dir, exist_ok=True)
+        directory = os.path.join(directory, self.metadata['name'])
+        os.makedirs(directory, exist_ok=True)
 
         global_len = 0
         for file in self.metadata['files']:
-            file_path = os.path.join(dir, *file['path'])
+            file_path = os.path.join(directory, *file['path'])
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             with open(file_path, 'wb') as f:
                 f.write(all_pieces[global_len:global_len + file['length']])
             global_len += file['length']
 
-        self.state = DownloadingFSM.SEEDING
         return all_pieces
 
     def init_file_manager(self):

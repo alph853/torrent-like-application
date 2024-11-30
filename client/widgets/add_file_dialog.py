@@ -430,7 +430,3 @@ class LoadingScreen(QDialog):
 
         self.setLayout(layout)
         self.setFixedSize(300, 150)
-
-    def set_message(self, message):
-        """Update the loading message."""
-        self.label.setText(message)

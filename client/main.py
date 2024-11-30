@@ -30,7 +30,7 @@ class MainWindow(QMainWindow):
         for button in self.findChildren(QPushButton):
             button.setCursor(Qt.CursorShape.PointingHandCursor)
 
-        self.loading_screen = None
+        self.loading_screen = LoadingScreen()
 
         # Torrent Table Model
         self.torrent_model = QStandardItemModel(self)
@@ -135,12 +135,14 @@ class MainWindow(QMainWindow):
         self.current_tab_idx = index
 
     def display_client_UI(self):
-        # for client in TORRENT_CLIENT_LIST:
-        #     if not client.is_metadata_complete():
-        #         self.display_loading_screen()
-        #         return
+        # if not TORRENT_CLIENT_LIST:
+        #     return
 
-        # self.hide_loading_screen()
+        # if not TORRENT_CLIENT_LIST[-1].init_done:
+        #     self.loading_screen.show()
+        #     return
+        # self.loading_screen.hide()
+
         if TORRENT_CLIENT_LIST:
             client = TORRENT_CLIENT_LIST[GLOBAL_ID]
             self.display_functions[self.current_tab_idx](client)
@@ -163,6 +165,9 @@ class MainWindow(QMainWindow):
 
     def display_download_progress(self, client):
         progress_list = client.get_progress()
+
+        if not progress_list:
+            return
 
         if self.previous_id_progress != GLOBAL_ID:
             self.files_model.removeRows(0, self.files_model.rowCount())
@@ -196,7 +201,6 @@ class MainWindow(QMainWindow):
                         f"{self.display_size_in_bytes(file_info['upspeed'])}/s"))
                     self.torrent_model.setItem(row, 6, QStandardItem(
                         f"{self.display_size_in_bytes(file_info['downspeed'])}/s"))
-
                     try:
                         progress = str(
                             int(round(file_info['downloaded']/(file_info['downloaded']+file_info['left']), 2)*100)) + '%'
@@ -221,16 +225,6 @@ class MainWindow(QMainWindow):
                     QStandardItem(f"{self.display_size_in_bytes(file_info['downspeed'])}/s")
                 ])
         self.previous_torrent_list = torrent_list
-
-    def display_loading_screen(self):
-        if not self.loading_screen:
-            self.loading_screen = LoadingScreen(self)
-        self.loading_screen.set_message("Loading torrent metadata...")
-        self.loading_screen.show()
-
-    def hide_loading_screen(self):
-        if self.loading_screen:
-            self.loading_screen.hide()
 
     @staticmethod
     def display_size_in_bytes(size: int) -> str:
