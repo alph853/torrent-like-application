@@ -1,10 +1,10 @@
 import socket
 
 # IP = input("Enter IP: ")
-IP = '192.168.1.194'
+IP = '10.128.49.47'
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.connect((IP, 65432))
+sock.connect((IP, 12000))
 
 
 while True:
