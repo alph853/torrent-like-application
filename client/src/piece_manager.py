@@ -366,6 +366,9 @@ class PieceManager:
             return progress
         return None
 
+    def pause():
+        pass
+
     def print_self_info(self):
         print(json.dumps({
             'state': self.state,

@@ -6,6 +6,7 @@ download_path = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.
 SAVE_DIR_TORRENT = download_path
 SAVE_DIR_MAGNET = download_path
 SAVE_DIR = download_path
-TRACKER_URL = 'http://10.128.49.47:8000/announce'
+TRACKER_URL = 'https://10diembtl.ngrok.app/announce'
 
-print(download_path)
+
+# TRACKER_URL = 'http://10.128.49.47:8000/announce'

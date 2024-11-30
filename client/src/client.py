@@ -253,6 +253,14 @@ class TorrentClient:
             'peers': peers,
         }
 
+    def pause(self):
+        self.prev_status = self.status
+        self.status = 'paused'
+        self.piece_manager.pause()
+
+    def cont(self):
+        self.status = self.prev_status
+
     # -------------------------------------------------
     # -------------------------------------------------
 
@@ -264,14 +272,19 @@ class TorrentClient:
             self.log("Waiting for metadata...\n")
             time.sleep(2)
 
-        self.log("Metadata downloaded!\n")
+        self.log("\nMetadata downloaded!\n\n")
 
         success_get_unchoked_peers = False
         while not self.piece_manager.is_done_downloading():
+            if self.status == 'paused':
+                continue
+
+            # (2) Waitng for piece response
             if self.piece_manager.is_waiting_for_piece_response():
                 time.sleep(0.5)
                 continue
 
+            # (3) Check if a piece is downloaded
             piece = self.piece_manager.is_piece_request_done()
             if piece is not None:
                 self.log(f"\nPiece {piece} downloaded!\n")
@@ -280,6 +293,7 @@ class TorrentClient:
                 success_get_unchoked_peers = False
                 continue
 
+            # (1) Initiate a new piece (if begin or no piece is being downloaded or no unchoked peer)
             if not success_get_unchoked_peers:
                 piece_idx, peers = self.piece_manager.find_next_rarest_piece()
                 if piece_idx is None:       # If no piece is found, all pieces are downloaded

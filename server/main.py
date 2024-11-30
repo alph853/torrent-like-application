@@ -42,7 +42,7 @@ async def announce(
 
     peer = Peer(
         peer_id=peer_id,
-        ip=request.client.host,
+        ip=ip,
         port=port,
         uploaded=uploaded,
         downloaded=downloaded,

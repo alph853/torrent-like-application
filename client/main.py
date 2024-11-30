@@ -6,6 +6,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QModelIndex, QTimer
 from PyQt6.uic import loadUi
 import sys
 
+import psutil
 import stun
 from widgets.add_file_dialog import *
 from src import TorrentClient
@@ -236,18 +237,24 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def get_ip_and_port():
-        hostname = socket.gethostname()
-        ip = socket.gethostbyname(hostname)
+        def get_wireless_lan_ip():
+            for interface_name, interface_addresses in psutil.net_if_addrs().items():
+                if any(x in interface_name for x in ['Wireless', 'Wi-Fi']):
+                    for address in interface_addresses:
+                        if address.family in (socket.AF_INET, socket.AF_INET6):
+                            return address.address
+            return ""
+
+        ip = get_wireless_lan_ip()
 
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.bind((ip, 0))
+            sock.bind(('', 0))
             port = sock.getsockname()[1]
 
         addr = {
             'ip': ip,
             'port': port
         }
-
         return addr
 
         # nat_type, external_ip, external_port = stun.get_ip_info(stun_host="stun.l.google.com", stun_port=19302)
