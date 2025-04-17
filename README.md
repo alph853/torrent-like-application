@@ -1,6 +1,6 @@
 # torrent-like-application
 
-A minimal BitTorrent‑style client and tracker reimplementation, following BEP 0, 1, 3, 9, 10, 20, 23.
+A minimal BitTorrent‑style client and tracker reimplementation, following BEP 0, 1, 3, 9, 10, 20, 23. See full report: [here](https://drive.google.com/file/d/1HduzRh0T6kNVjtVpH84Kc7_XfUTGyzXU/view?usp=sharing)
 
 ## Architecture
 
