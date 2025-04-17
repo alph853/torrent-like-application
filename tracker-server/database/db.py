@@ -106,9 +106,11 @@ class Database:
         else:
             return None
 
-    def get_torrent(self, info_hash: str) -> Torrent:
+    def get_torrent(self, info_hash: str = None) -> Torrent:
         """Retrieve a torrent by info_hash."""
-        return self.torrents.get(info_hash, None)
+        if info_hash:
+            return self.torrents.get(info_hash, None)
+        return self.torrents
 
     def __repr__(self):
         return f"Database(Torrents: {len(self.torrents)}, Peers: {len(self.peers)})"
